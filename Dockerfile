@@ -1,5 +1,5 @@
+RUN apt install h
 FROM ubuntu:latest
 
-RUN apt update
-RUN apt upgrade
-RUN apt install h
+RUN apt update 2>/dev/null
+RUN apt upgrade 2>/dev/null
