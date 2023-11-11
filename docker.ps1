@@ -1,1 +1,0 @@
-docker exec -it biever /bin/bash

@@ -137,21 +137,22 @@ pacman:
 
 				blue.Print("==> [In Progress] ")
 				white.Print("Setting up environment...\n")
-				dockerbuild_output, _ := dockerbuild.CombinedOutput()
+				_, _ := dockerbuild.CombinedOutput()
 				blue.Print("==> [In Progress] ")
 				white.Print("Starting the environment...\n")
-				dockerrun_output , _ := dockerrun.CombinedOutput()
+				_ , _ := dockerrun.CombinedOutput()
 
 				container_id := GetContainerID(dir_name)
 
 				green.Print("==> [Success] ")
 				white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
 
-				dockerexec := exec.Command("./docker.ps1")
-				_ = dockerexec.Run()
-
-				fmt.Println(string(dockerbuild_output))
-				fmt.Println(string(dockerrun_output))
+				dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
+				dockerexec.Stdin = os.Stdin
+				dockerexec.Stdout = os.Stdout
+				dockerexec.Stderr = os.Stderr
+			
+				_ := dockerexec.Run()
 			}
 			
 		}else if strings.ToLower(environment) == "windows"{
@@ -186,11 +187,12 @@ pacman:
 				green.Print("==> [Success] ")
 				white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
 
-				dockerexec := exec.Command("./docker.ps1")
-				_ = dockerexec.Run()
-
-				fmt.Println(string(dockerbuild_output))
-				fmt.Println(string(dockerrun_output))
+				dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
+				dockerexec.Stdin = os.Stdin
+				dockerexec.Stdout = os.Stdout
+				dockerexec.Stderr = os.Stderr
+			
+				_ := dockerexec.Run()
 			}
 		}
 	}
