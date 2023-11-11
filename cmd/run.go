@@ -46,6 +46,7 @@ var supported_pkg = []string{"apt", "dnf", "yum", "zypper", "pacman"}
 var red = color.New(color.FgRed, color.Bold)
 var white = color.New(color.FgWhite, color.Bold)
 var green = color.New(color.FgGreen, color.Bold)
+var blue = color.New(color.FgBlue, color.Bold)
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -115,10 +116,82 @@ pacman:
 			red.Print("==> [Error] ")
 			white.Print("Missing or invalid flag\n")
 		}else if strings.ToLower(environment) == "linux"{
-			CheckFlag(pkgmanager, distro, library, "Linux")
-			dockerbuild = execCommand("docker#build#.#-t ")
+			check_flag := CheckFlag(pkgmanager, distro, library, "Linux")
+			if check_flag == true{
+				dir_name := GetDirectoryName()
+				dir_mount := fmt.Sprintf(".:/%v", dir_name)
+				workdir := fmt.Sprintf("/%v", dir_name)
+
+				reset := []byte("")
+				_ = os.WriteFile("./docker.ps1", reset, 0644)
+			
+				file, _ := os.OpenFile("./docker.ps1", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				
+
+				dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
+				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+
+				write1 := fmt.Sprintf("Invoke-Command {docker exec -it %v /bin/bash}", dir_name)
+
+				_,_ = file.WriteString(write1)
+
+				blue.Print("==> [In Progress] ")
+				white.Print("Setting up environment...\n")
+				dockerbuild_output, _ := dockerbuild.CombinedOutput()
+				blue.Print("==> [In Progress] ")
+				white.Print("Starting the environment...\n")
+				dockerrun_output , _ := dockerrun.CombinedOutput()
+
+				container_id := GetContainerID(dir_name)
+
+				green.Print("==> [Success] ")
+				white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
+
+				dockerexec := exec.Command("./docker.ps1")
+				_ = dockerexec.Run()
+
+				fmt.Println(string(dockerbuild_output))
+				fmt.Println(string(dockerrun_output))
+			}
+			
 		}else if strings.ToLower(environment) == "windows"{
-			CheckFlag(pkgmanager, distro, library, "Windows")
+			check_flag := CheckFlag(pkgmanager, distro, library, "Windows")
+			if check_flag == true {
+				dir_name := GetDirectoryName()
+				dir_mount := fmt.Sprintf(".:/%v", dir_name)
+				workdir := fmt.Sprintf("/%v", dir_name)
+
+				reset := []byte("")
+				_ = os.WriteFile("./docker.ps1", reset, 0644)
+
+				file, _ := os.OpenFile("./docker.ps1", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+				dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
+				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+
+				write1 := fmt.Sprintf("Invoke-Command {docker exec -it %v /bin/bash}", dir_name)
+
+				_,_ = file.WriteString(write1)
+				
+
+				blue.Print("==> [In Progress] ")
+				white.Print("Setting up environment...\n")
+				dockerbuild_output, _ := dockerbuild.CombinedOutput()
+				blue.Print("==> [In Progress] ")
+				white.Print("Starting the environment...\n")
+				dockerrun_output , _ := dockerrun.CombinedOutput()
+
+				container_id := GetContainerID(dir_name)
+
+				green.Print("==> [Success] ")
+				white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
+
+				dockerexec := exec.Command("./docker.ps1")
+				_ = dockerexec.Run()
+
+				fmt.Println(string(dockerbuild_output))
+				fmt.Println(string(dockerrun_output))
+			}
 		}
 	}
 }
@@ -130,8 +203,15 @@ func RemoteMachine(environment string, pkgmanager string, library string, ip str
 func GetContainerID(dir_name string) string {
 	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
 	output, _ := cmd.CombinedOutput()
-	container_name := strings.TrimSpace(string(output)[0:len(string(output))-1])
-	return container_name
+	container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
+	return container_id
+}
+
+func GetDirectoryName() string{
+	dir, _ := os.Getwd()
+	dir_name_ := strings.Split(dir, "/")
+	dir_name := dir_name_[len(dir_name_)-1]
+	return dir_name
 }
 
 func CheckValidDistro(distro string) bool{
@@ -176,19 +256,10 @@ func apt(distro string, target string, libraries string){
 	_ = os.WriteFile("./Dockerfile", reset, 0644)
 	//Open Docker file
 	file, _ := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-	if libraries != ""{
-		library := strings.Split(libraries, ",")
-		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN apt install %v\n", o)
-			_,_ = file.WriteString(writelibrary)
-		}
-	}
 	 
-
 	write1 := fmt.Sprintf("FROM %v:latest\n\n", strings.ToLower(distro))
 	write2 := "RUN apt update 2>/dev/null\n"
-	write3 := "RUN apt upgrade 2>/dev/null\n"
+	write3 := "RUN apt upgrade -y 2>/dev/null\n"
 
 	_,_ = file.WriteString(write1)
 	_,_ = file.WriteString(write2)
@@ -210,6 +281,14 @@ func apt(distro string, target string, libraries string){
 		_,_ = file.WriteString(write8)
 		_,_ = file.WriteString(write9)
 	}
+	
+	if libraries != ""{
+		library := strings.Split(libraries, ",")
+		for _, o := range library{
+			writelibrary := fmt.Sprintf("RUN apt install %v 2>/dev/null\n", o)
+			_,_ = file.WriteString(writelibrary)
+		}
+	}
 
 }
 
@@ -219,17 +298,9 @@ func dnf(distro string, target string, libraries string){
 	//Open Docker file
 	file, _ := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
-	if libraries != ""{
-		library := strings.Split(libraries, ",")
-		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN dnf install %v\n", o)
-			_,_ = file.WriteString(writelibrary)
-		}
-	}
-
 	write1 := "FROM fedora:latest\n\n"
-	write2 := "RUN dnf update 2>/dev/null\n"
-	write3 := "RUN dnf upgrade 2>/dev/null\n"
+	write2 := "RUN dnf update -y 2>/dev/null\n"
+	write3 := "RUN dnf upgrade -y 2>/dev/null\n"
 
 	_,_ = file.WriteString(write1)
 	_,_ = file.WriteString(write2)
@@ -249,6 +320,15 @@ func dnf(distro string, target string, libraries string){
 		_,_ = file.WriteString(write7)
 		_,_ = file.WriteString(write8)
 	}
+
+	if libraries != ""{
+		library := strings.Split(libraries, ",")
+		for _, o := range library{
+			writelibrary := fmt.Sprintf("RUN dnf install %v 2>/dev/null\n", o)
+			_,_ = file.WriteString(writelibrary)
+		}
+	}
+
 }
 
 func yum(distro string, target string, libraries string){
@@ -257,16 +337,8 @@ func yum(distro string, target string, libraries string){
 	//Open Docker file
 	file, _ := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
-	if libraries != ""{
-		library := strings.Split(libraries, ",")
-		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN yum install %v\n", o)
-			_,_ = file.WriteString(writelibrary)
-		}
-	}
-
 	write1 := "FROM fedora:latest\n\n"
-	write2 := "RUN yum update 2>/dev/null\n"
+	write2 := "RUN yum update -y 2>/dev/null\n"
 	write3 := "RUN yum upgrade 2>/dev/null\n"
 
 	_,_ = file.WriteString(write1)
@@ -286,6 +358,15 @@ func yum(distro string, target string, libraries string){
 		_,_ = file.WriteString(write7)
 		_,_ = file.WriteString(write8)
 	}	
+
+	if libraries != ""{
+		library := strings.Split(libraries, ",")
+		for _, o := range library{
+			writelibrary := fmt.Sprintf("RUN yum install %v 2>/dev/null\n", o)
+			_,_ = file.WriteString(writelibrary)
+		}
+	}
+
 }
 
 func zypper(distro string, target string, libraries string){
@@ -293,18 +374,9 @@ func zypper(distro string, target string, libraries string){
 	_ = os.WriteFile("./Dockerfile", reset, 0644)
 	//Open Docker file
 	file, _ := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-	if libraries != ""{
-		library := strings.Split(libraries, ",")
-		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN zypper install %v\n", o)
-			_,_ = file.WriteString(writelibrary)
-		}
-	}
-
 	 
 	write1 := "FROM opensuse/leap:latest\n\n"
-	write2 := "RUN zypper update 2>/dev/null\n"
+	write2 := "RUN zypper update -y 2>/dev/null\n"
 	write3 := "RUN zypper install gzip curl tar libicu60_2 libopenssl1_0_0 -y 2>/dev/null\n"
 
 	_,_ = file.WriteString(write1)
@@ -326,20 +398,33 @@ func zypper(distro string, target string, libraries string){
 		_,_ = file.WriteString(write8)
 		_,_ = file.WriteString(write9)
 	}
+
+	if libraries != ""{
+		library := strings.Split(libraries, ",")
+		for _, o := range library{
+			writelibrary := fmt.Sprintf("RUN zypper install %v 2>/dev/null\n", o)
+			_,_ = file.WriteString(writelibrary)
+		}
+	}
+
 }
 
-func CheckFlag(pkgmanager string, distro string, library string, target string){
+func CheckFlag(pkgmanager string, distro string, library string, target string) bool{
 	if distro == "" && pkgmanager == ""{
 		apt(distro, target, library)
+		return true
 	}else if distro != "" && pkgmanager == ""{
 		validity := CheckValidDistro(distro)
 		if validity == true{
 			if strings.ToLower(distro) == "ubuntu" || strings.ToLower(distro) == "debian"{
 				apt(distro, target, library)
+				return true
 			}else if strings.ToLower(distro) == "fedora"{
 				dnf(distro, target, library)
+				return true
 			}else if strings.ToLower(distro) == "opensuse"{
 				zypper(distro, target, library)
+				return true
 			}
 		}else{
 			red.Print("==> [Error] ")
@@ -350,12 +435,16 @@ func CheckFlag(pkgmanager string, distro string, library string, target string){
 		if validity == true{
 			if pkgmanager == "apt"{
 				apt("Ubuntu", target, library)
+				return true
 			}else if pkgmanager == "dnf"{
 				dnf("Fedora", target, library)
+				return true
 			}else if pkgmanager == "yum"{
 				yum("Fedora", target, library)
+				return true
 			}else if pkgmanager == "zypper"{
 				zypper("openSUSE", target, library)
+				return true
 			}
 		}else{
 			red.Print("==> [Error] ")
@@ -380,18 +469,15 @@ func CheckFlag(pkgmanager string, distro string, library string, target string){
 		if validity_distro == true && validity_pkg == true && checkmatch == true{
 			if strings.ToLower(distro) == "ubuntu" || strings.ToLower(distro) == "debian"{
 				apt(distro, target, library)
+				return true
 			}else if strings.ToLower(distro) == "fedora"{
 				dnf(distro, target, library)
+				return true
 			}else if strings.ToLower(distro) == "opensuse"{
 				zypper(distro, target, library)
+				return true
 			}
 		}
 	}
-}
-
-func execCommand(command string) string{
-	cmds := strings.Split(command,"#")
-	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
-	output, _ := cmd.CombinedOutput()
-	return output
+	return false
 }
