@@ -36,7 +36,8 @@ var rootCmd = &cobra.Command{
   Long: `biever v1.0
     
 Set up remote development environment in isolated
-enivronment like docker, remote machine, or cloud
+enivronment like docker or proxy server to use
+remote machine or cloud machine as development environment
   `,
   CompletionOptions: cobra.CompletionOptions{
     DisableDefaultCmd: true,

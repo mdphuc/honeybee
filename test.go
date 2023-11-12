@@ -15,7 +15,7 @@ func main(){
 	// write1 := fmt.Sprintf("Invoke-Command {docker exec -it biever /bin/bash}")
 	// _,_ = file.WriteString(write1)
 	// _ = os.Chdir("/mnt/c/Windows/System32/WindowsPowerShell/v1.0")
-	dockerexec := exec.Command("docker", "attach", "a1f5ec042f2b")
+	dockerexec := exec.Command("docker", "exec", "-it", "8cc3f81e97ba", "sh", "-c", "mkdir /biever")
 	dockerexec.Stdin = os.Stdin
 	dockerexec.Stdout = os.Stdout
 	dockerexec.Stderr = os.Stderr

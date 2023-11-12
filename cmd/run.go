@@ -37,6 +37,10 @@ var validargs = []string{
 	"user",
 	"distro",
 	"os",
+	"build",
+	"compose",
+	"reset",
+	"connect",
 }
 
 var supported_distro = []string{"ubuntu", "debian", "fedora", "opensuse"}
@@ -50,7 +54,7 @@ var blue = color.New(color.FgBlue, color.Bold)
 
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "run remote development environment",
+	Short: "Run Set up the environment",
 	Run: func(cmd *cobra.Command, args []string) {
 
 		target, _ := cmd.Flags().GetString("target")
@@ -61,13 +65,18 @@ var runCmd = &cobra.Command{
 		user,_ := cmd.Flags().GetString("user")
 		distro,_ := cmd.Flags().GetString("distro")
 		os_ := cmd.Flags().Lookup("os").Changed
+		build,_ := cmd.Flags().GetString("build")
+		reset := cmd.Flags().Lookup("reset").Changed
+		compose := cmd.Flags().Lookup("compose").Changed
+		connect := cmd.Flags().Lookup("connect").Changed
 
 		if target != "docker" && target != "remote_machine"{
-			color.Red("[Error] Invalid target")
+			red.Print("==> [Error] ")
+			white.Print("Invalid target\n")
 		}else if target == "docker"{
-			Docker(environment, pkgmanager, library, os_, distro)
+			Docker(environment, pkgmanager, library, os_, distro, build, reset)
 		}else{
-			RemoteMachine(environment, pkgmanager, library, ip, user)
+			RemoteMachine(ip, user, reset, compose, connect)
 		}
 	},
 	ValidArgs: validargs,
@@ -84,11 +93,16 @@ func init() {
 	runCmd.PersistentFlags().String("ip", "", "IP for remote machine")
 	runCmd.PersistentFlags().String("user", "", "Username for remote machine")
 	runCmd.PersistentFlags().BoolP("os", "", true, "Supported OS for Docker environment and their package manager")
+	runCmd.PersistentFlags().String("build", "", "Build docker machine using docker file (for --target=docker)")
+	runCmd.PersistentFlags().BoolP("compose", "", "Build proxy server (for --target=remotemachine)")
+	runCmd.PersistentFlags().BoolP("reset", "", true, "Reset development environment")
+	runCmd.PersistentFlags().BoolP("connect", "", true, "Set up connection between proxy server and remote machine (for --target=remote_machine)")
+
 }
 
-func Docker(environment string, pkgmanager string, library string, os_ bool, distro string){
+func Docker(environment string, pkgmanager string, library string, os_ bool, distro string, build string, reset bool){
 	if os_ == true {
-		if environment != " " && pkgmanager != " " && distro != " "{
+		if environment == "" && pkgmanager == "" && distro == "" && build == "" && reset == false{
 			white.Println("Supported operating system for Docker environment")
 			white.Println(`
 apt:
@@ -111,6 +125,61 @@ pacman:
 			red.Print("==> [Error] ")
 			white.Print("Invalid combination of flag\n")
 		}
+	}else if build != ""{
+		if environment == "" && pkgmanager == "" && distro == "" && os_ == false && reset == false{
+			dir_name := GetDirectoryName()
+			dir_mount := fmt.Sprintf(".:/%v", dir_name)
+			workdir := fmt.Sprintf("/%v", dir_name)
+
+			blue.Print("==> [In Progress] ")
+			white.Print("Setting up environment...\n")
+			dockerbuild := exec.Command("docker", "build", build, "-t", string(dir_name), "--quite")
+
+			blue.Print("==> [In Progress] ")
+			white.Print("Starting the environment...\n")
+			dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+
+			_, err_build := dockerbuild.CombinedOutput()
+			if err_build == nil{
+				_,_ = dockerrun.CombinedOutput()
+
+				container_id := GetContainerID(dir_name)
+
+				green.Print("==> [Success] ")
+				white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
+
+				dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
+				dockerexec.Stdin = os.Stdin
+				dockerexec.Stdout = os.Stdout
+				dockerexec.Stderr = os.Stderr
+			
+				_ = dockerexec.Run()
+			}else{
+				red.Print("==> [Error] ")
+				white.Print(err_build)	
+			}
+		}else{
+			red.Print("==> [Error] ")
+			white.Print("Invalid combination of flag\n")
+		}
+	}else if reset == true {	
+		if environment == "" && pkgmanager == "" && distro == "" && os_ == false && reset == false{
+			dir_name := GetDirectoryName()
+			container_id = GetContainerID(dir_name)
+			if container_id != "Not Found"{
+				dockerstop := exec.Command("docker","stop",container_id)
+				dockerprune := exec.Command("docker","system","prune","-y")
+
+				_ = dockerstop.Run()
+				_ = dockerprune.Run()
+			}else{
+				red.Print("==> [Error] ")
+				white.Print("Environment not found\n")	
+			}
+		}else{
+			red.Print("==> [Error] ")
+			white.Print("Invalid combination of flag\n")
+		}
 	}else{
 		if strings.ToLower(environment) != "windows" && strings.ToLower(environment) != "linux"{
 			red.Print("==> [Error] ")
@@ -120,27 +189,17 @@ pacman:
 			if check_flag == true{
 				dir_name := GetDirectoryName()
 				dir_mount := fmt.Sprintf(".:/%v", dir_name)
-				workdir := fmt.Sprintf("/%v", dir_name)
+				workdir := fmt.Sprintf("/%v", dir_name)		
 
-				reset := []byte("")
-				_ = os.WriteFile("./docker.ps1", reset, 0644)
-			
-				file, _ := os.OpenFile("./docker.ps1", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				
-
-				dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
+				dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name), "--quite")
 				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
-
-				write1 := fmt.Sprintf("Invoke-Command {docker exec -it %v /bin/bash}", dir_name)
-
-				_,_ = file.WriteString(write1)
 
 				blue.Print("==> [In Progress] ")
 				white.Print("Setting up environment...\n")
-				_, _ := dockerbuild.CombinedOutput()
+				_, _ = dockerbuild.CombinedOutput()
 				blue.Print("==> [In Progress] ")
 				white.Print("Starting the environment...\n")
-				_ , _ := dockerrun.CombinedOutput()
+				_ , _ = dockerrun.CombinedOutput()
 
 				container_id := GetContainerID(dir_name)
 
@@ -152,7 +211,7 @@ pacman:
 				dockerexec.Stdout = os.Stdout
 				dockerexec.Stderr = os.Stderr
 			
-				_ := dockerexec.Run()
+				_ = dockerexec.Run()
 			}
 			
 		}else if strings.ToLower(environment) == "windows"{
@@ -162,25 +221,15 @@ pacman:
 				dir_mount := fmt.Sprintf(".:/%v", dir_name)
 				workdir := fmt.Sprintf("/%v", dir_name)
 
-				reset := []byte("")
-				_ = os.WriteFile("./docker.ps1", reset, 0644)
-
-				file, _ := os.OpenFile("./docker.ps1", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
 				dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
-				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
-
-				write1 := fmt.Sprintf("Invoke-Command {docker exec -it %v /bin/bash}", dir_name)
-
-				_,_ = file.WriteString(write1)
-				
+				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)				
 
 				blue.Print("==> [In Progress] ")
 				white.Print("Setting up environment...\n")
-				dockerbuild_output, _ := dockerbuild.CombinedOutput()
+				_, _ = dockerbuild.CombinedOutput()
 				blue.Print("==> [In Progress] ")
 				white.Print("Starting the environment...\n")
-				dockerrun_output , _ := dockerrun.CombinedOutput()
+				_, _ = dockerrun.CombinedOutput()
 
 				container_id := GetContainerID(dir_name)
 
@@ -192,21 +241,77 @@ pacman:
 				dockerexec.Stdout = os.Stdout
 				dockerexec.Stderr = os.Stderr
 			
-				_ := dockerexec.Run()
+				_ = dockerexec.Run()
 			}
 		}
 	}
 }
 
-func RemoteMachine(environment string, pkgmanager string, library string, ip string, user string){
+func RemoteMachine(ip string, username string, reset bool, compose bool, connect bool){
+	if compose == true {
+		if reset == false && connect == false{
+			if ip != "" && username != ""{
+				dir_name := GetDirectoryName()
+				dir_mount := fmt.Sprintf(".:/%v", dir_name)
+				workdir := fmt.Sprintf("/%v", dir_name)
 
+				reset := []byte("")
+				_ = os.WriteFile("./Dockerfile", reset, 0644)
+				//Open Docker file
+				file, _ := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				
+				write1 := fmt.Sprintf("FROM %v:latest\n\n", strings.ToLower(distro))
+				write2 := "RUN apt update 2>/dev/null\n"
+				write3 := "RUN apt upgrade -y 2>/dev/null\n"
+				write4 := "RUN apt install openssh-client -y\n"
+				write5 := "RUN apt install systemctl -y \n"
+				write6 := "RUN ssh-keygen -t rsa"
+				write7 := fmt.Sprintf("RUN mkdir /%v/.ssh", dir_name)
+				write8 := fmt.Sprintf("RUN cp ~/.ssh/id_rsa.pub /%v/.ssh", dir_name)
+				write9 := fmt.Sprintf("RUN echo '#!/bin/bash' >> /%v/monitor.sh", dir_name)
+				write10 := fmt.Sprintf("RUN echo 'while true; do scp -i ~/.ssh/id_rsa -r /%v %v@%v:/ 2>/dev/null; sleep 1; done' >> /%v/monitor.sh", dir_name, ip)
+
+
+				_,_ = file.WriteString(write1)
+				_,_ = file.WriteString(write2)
+				_,_ = file.WriteString(write3)
+				
+			}else{
+				red.Print("==> [Error] ")
+				white.Print("Invalid or missing flag\n")	
+			}
+			
+		}else{
+			red.Print("==> [Error] ")
+			white.Print("Invalid combination of flag\n")
+		}
+	}else if reset == true{
+		if ip == "" && username == "" && compose == false && connect == false{
+
+			}else{
+				red.Print("==> [Error] ")
+				white.Print("Invalid combination of flag\n")
+			}
+	
+	}else if connect == true{
+		if ip == "" && username == "" && compose == false && reset == false{
+
+			}else{
+				red.Print("==> [Error] ")
+				white.Print("Invalid combination of flag\n")
+			}
+
+	}
 }
 
 func GetContainerID(dir_name string) string {
 	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
-	output, _ := cmd.CombinedOutput()
-	container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
-	return container_id
+	output, err := cmd.CombinedOutput()
+	if err != nil{
+		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
+		return container_id
+	}
+	return "Not Found"
 }
 
 func GetDirectoryName() string{
@@ -287,11 +392,13 @@ func apt(distro string, target string, libraries string){
 	if libraries != ""{
 		library := strings.Split(libraries, ",")
 		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN apt install %v 2>/dev/null\n", o)
+			writelibrary := fmt.Sprintf("RUN apt install -y %v 2>/dev/null\n", o)
 			_,_ = file.WriteString(writelibrary)
 		}
 	}
 
+	writelibrary_essential := "\nRUN apt install git -y 2>/dev/null"
+	_,_ = file.WriteString(writelibrary_essential)
 }
 
 func dnf(distro string, target string, libraries string){
@@ -326,10 +433,13 @@ func dnf(distro string, target string, libraries string){
 	if libraries != ""{
 		library := strings.Split(libraries, ",")
 		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN dnf install %v 2>/dev/null\n", o)
+			writelibrary := fmt.Sprintf("RUN dnf install %v -y 2>/dev/null\n", o)
 			_,_ = file.WriteString(writelibrary)
 		}
 	}
+	writelibrary_essential := "\nRUN dnf install git -y"
+	_,_ = file.WriteString(writelibrary_essential)
+
 
 }
 
@@ -364,10 +474,13 @@ func yum(distro string, target string, libraries string){
 	if libraries != ""{
 		library := strings.Split(libraries, ",")
 		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN yum install %v 2>/dev/null\n", o)
+			writelibrary := fmt.Sprintf("RUN yum install %v -y 2>/dev/null\n", o)
 			_,_ = file.WriteString(writelibrary)
 		}
 	}
+
+	writelibrary_essential := "\nRUN yum install git -y"
+	_,_ = file.WriteString(writelibrary_essential)
 
 }
 
@@ -404,10 +517,14 @@ func zypper(distro string, target string, libraries string){
 	if libraries != ""{
 		library := strings.Split(libraries, ",")
 		for _, o := range library{
-			writelibrary := fmt.Sprintf("RUN zypper install %v 2>/dev/null\n", o)
+			writelibrary := fmt.Sprintf("RUN zypper install %v -y 2>/dev/null\n", o)
 			_,_ = file.WriteString(writelibrary)
 		}
 	}
+
+	writelibrary_essential := "\nRUN zypper install git -y"
+	_,_ = file.WriteString(writelibrary_essential)
+
 
 }
 
