@@ -49,24 +49,29 @@ var dockerCmd = &cobra.Command{
 		os_ := cmd.Flags().Lookup("os").Changed
 		build,_ := cmd.Flags().GetString("build")
 
-		Docker(environment, pkgmanager, library, os_, distro, build)
+		if environment == "" && pkgmanager == "" && library == "" && os_ == false && distro == "" && build == ""{
+			red.Print("==> [Error] ")
+			white.Print("Missing flag\n")
+		}else{
+			Docker(environment, pkgmanager, library, os_, distro, build)
+		}
 	},
 }
 
 func init() {
 	runCmd.AddCommand(dockerCmd)
 
-	dockerCmd.PersistentFlags().String("environment", "e", "Linux", "Base of the Environment")
-	dockerCmd.PersistentFlags().String("pkgmanager", "p", "", "Package manager")
-	dockerCmd.PersistentFlags().String("distro", "d", "", "Linux distro")
-	dockerCmd.PersistentFlags().String("library", "l", "", "Library to pre-install (separate by comma)")
+	dockerCmd.PersistentFlags().String("environment", "", "Base of the Environment")
+	dockerCmd.PersistentFlags().String("pkgmanager", "", "Package manager")
+	dockerCmd.PersistentFlags().String("distro", "", "Linux distro")
+	dockerCmd.PersistentFlags().String("library", "", "Library to pre-install (separate by comma)")
  	dockerCmd.PersistentFlags().BoolP("os", "", true, "Supported OS for Docker environment and their package manager")
-	dockerCmd.PersistentFlags().String("build", "b", "", "Build docker machine using docker file")
+	dockerCmd.PersistentFlags().String("build", "", "Build docker machine using docker file")
 }
 
 func Docker(environment string, pkgmanager string, library string, os_ bool, distro string, build string){
 	if os_ == true {
-		if environment == "" && pkgmanager == "" && distro == "" && build == "" && reset == false{
+		if environment == "" && pkgmanager == "" && distro == "" && build == ""{
 			white.Println("Supported operating system for Docker environment")
 			white.Println(`
 apt:
@@ -90,9 +95,9 @@ pacman:
 			white.Print("Invalid combination of flag\n")
 		}
 	}else if build != ""{
-		if environment == "" && pkgmanager == "" && distro == "" && os_ == false && reset == false{
-			container_id := GetContainerID(dir_name)
+		if environment == "" && pkgmanager == "" && distro == "" && os_ == false{
 			dir_name := GetDirectoryName()
+			container_id := GetContainerID(dir_name)
 			if container_id == "Not Found"{
 				dir_mount := fmt.Sprintf(".:/%v", dir_name)
 				workdir := fmt.Sprintf("/%v", dir_name)
@@ -122,11 +127,11 @@ pacman:
 					_ = dockerexec.Run()
 				}else{
 					red.Print("==> [Error] ")
-					white.Print("The environment already up")		
+					white.Print(err_build)	
 				}
 			}else{
 				red.Print("==> [Error] ")
-				white.Print(err_build)	
+				white.Print("The environment already up")		
 			}
 		}else{
 			red.Print("==> [Error] ")
@@ -214,23 +219,6 @@ pacman:
 			}
 		}
 	}
-}
-
-func GetContainerID(dir_name string) string {
-	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
-	output, err := cmd.CombinedOutput()
-	if err != nil{
-		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
-		return container_id
-	}
-	return "Not Found"
-}
-
-func GetDirectoryName() string{
-	dir, _ := os.Getwd()
-	dir_name_ := strings.Split(dir, "/")
-	dir_name := dir_name_[len(dir_name_)-1]
-	return dir_name
 }
 
 func CheckValidDistro(distro string) bool{

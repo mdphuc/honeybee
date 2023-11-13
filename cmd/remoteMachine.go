@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/fatih/color"
 	"os/exec"
 	"strings"
 	// "slices"
@@ -27,40 +26,39 @@ import (
 	"os"
 )
 
-var red = color.New(color.FgRed, color.Bold)
-var white = color.New(color.FgWhite, color.Bold)
-var green = color.New(color.FgGreen, color.Bold)
-var blue = color.New(color.FgBlue, color.Bold)
-
-
 // remoteMachineCmd represents the remoteMachine command
 var remoteMachineCmd = &cobra.Command{
 	Use:   "remoteMachine",
 	Short: "Set up proxy server to use remote machine as development environment",
-	Run: func(cmd *cobra.Command, args [string]){
+	Run: func(cmd *cobra.Command, args []string){
 		ip,_ := cmd.Flags().GetString("ip")
-		user,_ := cmd.Flags().GetString("user")
+		username,_ := cmd.Flags().GetString("user")
 		compose := cmd.Flags().Lookup("compose").Changed
 		connect := cmd.Flags().Lookup("connect").Changed
 
-		RemoteMachine(ip, user, compose, connect)
-	}
+		if compose == false && connect == false{
+			red.Print("==> [Error] ")
+			white.Print("Missing flag\n")
+		}else{
+			RemoteMachine(ip, username, compose, connect)
+		}
+	},
 }
 
 func init() {
 	runCmd.AddCommand(remoteMachineCmd)
 
 	remoteMachineCmd.PersistentFlags().String("ip", "", "IP address of the remote environment")
-	runCmd.PersistentFlags().String("user", "u", "", "Username for remote machine")
-	runCmd.PersistentFlags().BoolP("compose", "", true, "Build proxy server")
-	runCmd.PersistentFlags().BoolP("connect", "c" , "", true, "Set up connection between proxy server and remote machine")
+	remoteMachineCmd.PersistentFlags().String("user", "", "Username for remote machine")
+	remoteMachineCmd.PersistentFlags().BoolP("compose", "", true, "Build proxy server")
+	remoteMachineCmd.PersistentFlags().BoolP("connect", "", true, "Set up connection between proxy server and remote machine")
 	
 }
 
 
 func RemoteMachine(ip string, username string, compose bool, connect bool){
 	if compose == true {
-		if reset == false && connect == false{
+		if connect == false && ip != "" && username != ""{
 			dir_name := GetDirectoryName()
 			container_id := GetContainerID(dir_name)
 			if container_id == "Not Found"{
@@ -68,18 +66,17 @@ func RemoteMachine(ip string, username string, compose bool, connect bool){
 					dir_mount := fmt.Sprintf(".:/%v", dir_name)
 					workdir := fmt.Sprintf("/%v", dir_name)
 					monitor_service_b64 := "W1VuaXRdCkRlc2NyaXB0aW9uPU1vbml0b3IgRmlsZQoKW1NlcnZpY2VdCkV4ZWNTdGFydD0vYmluL2Jhc2ggL3Vzci9iaW4vbW9uaXRvci5zaAoKCltJbnN0YWxsXQpXYW50ZWRCeT1tdWx0aS11c2VyLnRhcmdldA==" //base64 encode
-					monitor_service, _ := monitor_service_b64.StdEncoding.DecodeString(monitor_service_b64)
+					monitor_service, _ := b64.StdEncoding.DecodeString(monitor_service_b64)
 					monitor_service_write := []byte(monitor_service)
 
 					reset := []byte("")
 					_ = os.WriteFile("./Dockerfile", reset, 0644)
 					//Open Docker file
 					file, _ := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-					monitor_service_file, _ := os.OpenFile("./monitor.service")
-
+					
 					_ = os.WriteFile("./monitor.service", monitor_service_write, 0644)
 					
-					write1 := fmt.Sprintf("FROM %v:latest\n\n", strings.ToLower(distro))
+					write1 := fmt.Sprintf("FROM ubuntu:latest\n\n")
 					write2 := "RUN apt update 2>/dev/null\n"
 					write3 := "RUN apt upgrade -y 2>/dev/null\n"
 					write4 := "RUN apt install openssh-client -y 2>/dev/null\n"
@@ -138,12 +135,9 @@ func RemoteMachine(ip string, username string, compose bool, connect bool){
 				
 					_ = dockerexec.Run()
 					_ = dockerfile_rm.Run()
-
-					credential_file := os.OpenFile("./credential.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-					_ = os.WriteFile("./credential.log", reset, 0644)
 					
-					write_credential := fmt.Sprintf("%v@%v", username, ip)
+					write_credential := []byte(fmt.Sprintf("%v@%v", username, ip))
+					_ = os.WriteFile("./credential.log", write_credential, 0644)
 					
 				}else{
 					red.Print("==> [Error] ")
@@ -158,47 +152,31 @@ func RemoteMachine(ip string, username string, compose bool, connect bool){
 			white.Print("Invalid combination of flag\n") 
 		}
 	}else if connect == true{
-		if ip == "" && username == "" && compose == false && reset == false{
+		if ip == "" && username == "" && compose == false{
 			dir_name := GetDirectoryName()
-			dir_mount := fmt.Sprintf(".:/%v", dir_name)
-			workdir := fmt.Sprintf("/%v", dir_name)
-			credentials, _ := os.ReadFile("./credential.log")
-			credential := strings.Split(string(credentials), "\n")
+			container_id := GetContainerID(dir_name)
+			if(container_id != "Not Found"){
+				credentials, err := os.ReadFile("./credential.log")
 
-			if err != nil{
-				ssh := fmt.Sprintf("ssh -i /root/.ssh/id_rsa %v", credential[0])
+				if err != nil{
+					credential := strings.Split(string(credentials), "\n")
+					ssh := fmt.Sprintf("ssh -i /root/.ssh/id_rsa %v", credential[0])
 
-				docker_connect := exec.Command("docker", "exec", "-it", dir_name, "-c", ssh)
+					docker_connect := exec.Command("docker", "exec", "-it", dir_name, "-c", ssh)
 
-				_, err_conn := docker_connect.CombinedOutput()
-				if err_conn != nil{
+					_, err_conn := docker_connect.CombinedOutput()
+					if err_conn != nil{
+						red.Print("==> [Error] ")
+						white.Print(err_conn)	
+					}
+				}else{
 					red.Print("==> [Error] ")
-					white.Print(err_conn)	
+					white.Print(err)	
 				}
-			}else{
-				red.Print("==> [Error] ")
-				white.Print(err)	
 			}
 		}else{
 			red.Print("==> [Error] ")
 			white.Print("Invalid combination of flag\n")
 		}
 	}
-}
-
-func GetDirectoryName() string{
-	dir, _ := os.Getwd()
-	dir_name_ := strings.Split(dir, "/")
-	dir_name := dir_name_[len(dir_name_)-1]
-	return dir_name
-}
-
-func GetContainerID(dir_name string) string {
-	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
-	output, err := cmd.CombinedOutput()
-	if err != nil{
-		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
-		return container_id
-	}
-	return "Not Found"
 }

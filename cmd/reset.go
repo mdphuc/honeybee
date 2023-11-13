@@ -17,29 +17,20 @@ package cmd
 
 import (
 	"fmt"
-
+	"strings"
 	"github.com/spf13/cobra"
-	"github.com/fatih/color"
 	"os"
 	"os/exec"
 )
-
-var red = color.New(color.FgRed, color.Bold)
-var white = color.New(color.FgWhite, color.Bold)
-var green = color.New(color.FgGreen, color.Bold)
-var blue = color.New(color.FgBlue, color.Bold)
 
 // resetCmd represents the reset command
 var resetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Reset the environment",
 	Run: func(cmd *cobra.Command, args []string) {
-		dir_name := GetDirectoryName()
-		container_id := GetContainerID(dir_name)
-
-		docker = cmd.Flags().Lookup("docker").Changed
-		remote_machine = cmd.Flags().Lookup("remote_machine").Changed
-
+		docker := cmd.Flags().Lookup("docker").Changed
+		remote_machine := cmd.Flags().Lookup("remote_machine").Changed
+		
 		if docker == false && remote_machine == false{
 			red.Print("==> [Error] ")
 			white.Print("Missing flag\n")	
@@ -48,14 +39,14 @@ var resetCmd = &cobra.Command{
 			white.Print("Invalid combination of flag\n") 
 		}else{
 			dir_name := GetDirectoryName()
-			container_id := GetContainerID()
+			container_id := GetContainerID(dir_name)
 			if container_id == "Not Found"{
 				red.Print("==> [Error] ")
 				white.Print("The environment not found\n") 	
 			}else{
 				if docker == true{
 					dockerstop := exec.Command("docker", "stop", container_id)
-					dockerprune := exec.command("docker", "system", "prune")
+					dockerprune := exec.Command("docker", "system", "prune")
 
 					_ = dockerstop.Run()
 					_ = dockerprune.Run()
@@ -66,9 +57,9 @@ var resetCmd = &cobra.Command{
 						reset_command := fmt.Sprintf("ssh -i /root/.ssh/id_rsa %v 'rm -rf /%v'", credential[0], dir_name)
 						dockerrm := exec.Command("docker", "exec", "-it", container_id, "sh", "-c", reset_command)
 						dockerstop := exec.Command("docker", "stop", container_id)
-						dockerprune := exec.command("docker", "system", "prune")
+						dockerprune := exec.Command("docker", "system", "prune")
 	
-						_ := dockerrm.Run()
+						_ = dockerrm.Run()
 						_ = dockerstop.Run()
 						_ = dockerprune.Run()
 	
@@ -85,24 +76,8 @@ var resetCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(resetCmd)
 
-	resetCmd.PersistentFlags().Boolp("docker", "d", "", true, "Username for remote machine")
-	resetCmd.PersistentFlags().BoolP("remote_machine", "r", "", true, "Build proxy server")
+	resetCmd.PersistentFlags().BoolP("docker","", true, "Username for remote machine")
+	resetCmd.PersistentFlags().BoolP("remote_machine", "", true, "Build proxy server")
 
 }
 
-func GetDirectoryName() string{
-	dir, _ := os.Getwd()
-	dir_name_ := strings.Split(dir, "/")
-	dir_name := dir_name_[len(dir_name_)-1]
-	return dir_name
-}
-
-func GetContainerID(dir_name string) string {
-	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
-	output, err := cmd.CombinedOutput()
-	if err != nil{
-		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
-		return container_id
-	}
-	return "Not Found"
-}

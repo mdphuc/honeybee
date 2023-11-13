@@ -20,6 +20,9 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"os"
+	"strings"
+	"os/exec"
 )
 
 var runCmd = &cobra.Command{
@@ -30,5 +33,23 @@ var runCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(runCmd)
+}
+
+
+func GetDirectoryName() string{
+	dir, _ := os.Getwd()
+	dir_name_ := strings.Split(dir, "/")
+	dir_name := dir_name_[len(dir_name_)-1]
+	return dir_name
+}
+
+func GetContainerID(dir_name string) string {
+	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
+	output, err := cmd.CombinedOutput()
+	if err != nil{
+		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
+		return container_id
+	}
+	return "Not Found"
 }
 
