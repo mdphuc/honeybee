@@ -31,41 +31,49 @@ var resetCmd = &cobra.Command{
 		docker := cmd.Flags().Lookup("docker").Changed
 		remote_machine := cmd.Flags().Lookup("remote_machine").Changed
 		
-		if docker == false && remote_machine == false{
-			red.Print("==> [Error] ")
-			white.Print("Missing flag\n")	
-		}else if docker == true && remote_machine == true{
-			red.Print("==> [Error] ")
-			white.Print("Invalid combination of flag\n") 
-		}else{
-			dir_name := GetDirectoryName()
-			container_id := GetContainerID(dir_name)
-			if container_id == "Not Found"{
-				red.Print("==> [Error] ")
-				white.Print("The environment not found\n") 	
-			}else{
-				if docker == true{
-					dockerstop := exec.Command("docker", "stop", container_id)
-					dockerprune := exec.Command("docker", "system", "prune")
+		check_docker := exec.Command("docker", "network", "ls")
+		_, err := check_docker.CombinedOutput()
 
-					_ = dockerstop.Run()
-					_ = dockerprune.Run()
+		if err != nil{
+			red.Print("==> [Error] ")
+			white.Print("Docker not running\n")
+		}else{
+			if docker == false && remote_machine == false{
+				red.Print("==> [Error] ")
+				white.Print("Missing flag\n")	
+			}else if docker == true && remote_machine == true{
+				red.Print("==> [Error] ")
+				white.Print("Invalid combination of flag\n") 
+			}else{
+				dir_name := GetDirectoryName()
+				container_id := GetContainerID(dir_name)
+				if container_id == "Not Found"{
+					red.Print("==> [Error] ")
+					white.Print("The environment not found\n") 	
 				}else{
-					credentials, err := os.ReadFile("./credential.log. Please add <username>@<ip> to the first line of credential.log\n")
-					if err == nil{
-						credential := strings.Split(string(credentials), "\n")
-						reset_command := fmt.Sprintf("ssh -i /root/.ssh/id_rsa %v 'rm -rf /%v'", credential[0], dir_name)
-						dockerrm := exec.Command("docker", "exec", "-it", container_id, "sh", "-c", reset_command)
+					if docker == true{
 						dockerstop := exec.Command("docker", "stop", container_id)
 						dockerprune := exec.Command("docker", "system", "prune")
-	
-						_ = dockerrm.Run()
+
 						_ = dockerstop.Run()
 						_ = dockerprune.Run()
-	
 					}else{
-						red.Print("==> [Error] ")
-						white.Print("credential.log not found. \n") 			
+						credentials, err := os.ReadFile("./credential.log. Please add <username>@<ip> to the first line of credential.log\n")
+						if err == nil{
+							credential := strings.Split(string(credentials), "\n")
+							reset_command := fmt.Sprintf("ssh -i /root/.ssh/id_rsa %v 'rm -rf /%v'", credential[0], dir_name)
+							dockerrm := exec.Command("docker", "exec", "-it", container_id, "sh", "-c", reset_command)
+							dockerstop := exec.Command("docker", "stop", container_id)
+							dockerprune := exec.Command("docker", "system", "prune")
+		
+							_ = dockerrm.Run()
+							_ = dockerstop.Run()
+							_ = dockerprune.Run()
+		
+						}else{
+							red.Print("==> [Error] ")
+							white.Print("credential.log not found. \n") 			
+						}
 					}
 				}
 			}

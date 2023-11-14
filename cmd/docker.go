@@ -49,12 +49,22 @@ var dockerCmd = &cobra.Command{
 		os_ := cmd.Flags().Lookup("os").Changed
 		build,_ := cmd.Flags().GetString("build")
 
-		if environment == "" && pkgmanager == "" && library == "" && os_ == false && distro == "" && build == ""{
+		check_docker := exec.Command("docker", "network", "ls")
+		_, err := check_docker.CombinedOutput()
+
+		if err != nil {
 			red.Print("==> [Error] ")
-			white.Print("Missing flag\n")
+			white.Print("Docker not running\n")
 		}else{
-			Docker(environment, pkgmanager, library, os_, distro, build)
+			if environment == "" && pkgmanager == "" && library == "" && os_ == false && distro == "" && build == ""{
+				red.Print("==> [Error] ")
+				white.Print("Missing flag\n")
+			}else{
+				Docker(environment, pkgmanager, library, os_, distro, build)
+			}		
 		}
+
+
 	},
 }
 
@@ -68,6 +78,7 @@ func init() {
  	dockerCmd.PersistentFlags().BoolP("os", "", true, "Supported OS for Docker environment and their package manager")
 	dockerCmd.PersistentFlags().String("build", "", "Build docker machine using docker file")
 }
+
 
 func Docker(environment string, pkgmanager string, library string, os_ bool, distro string, build string){
 	if os_ == true {

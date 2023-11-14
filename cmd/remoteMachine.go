@@ -36,11 +36,19 @@ var remoteMachineCmd = &cobra.Command{
 		compose := cmd.Flags().Lookup("compose").Changed
 		connect := cmd.Flags().Lookup("connect").Changed
 
-		if compose == false && connect == false{
+		check_docker := exec.Command("docker", "network", "ls")
+		_, err := check_docker.CombinedOutput()
+
+		if err != nil {
 			red.Print("==> [Error] ")
-			white.Print("Missing flag\n")
+			white.Print("Docker not running\n")
 		}else{
-			RemoteMachine(ip, username, compose, connect)
+			if compose == false && connect == false{
+				red.Print("==> [Error] ")
+				white.Print("Missing flag\n")
+			}else{
+				RemoteMachine(ip, username, compose, connect)
+			}
 		}
 	},
 }
