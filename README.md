@@ -19,4 +19,4 @@ The project, utilizing Golang, is designed as a middle place to run and test cod
 - If you have recent go compiler install: ```go install github.com/mdphuc/beaver```
 
   _or_
-- Download prebuilt file: `https://github.com/mdphuc/beaver/releases/download/v1.0/beaver`
+- Download prebuilt file: https://github.com/mdphuc/beaver/releases/download/v1.0/beaver
