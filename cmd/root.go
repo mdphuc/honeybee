@@ -31,7 +31,7 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-  Use:   "biever",
+  Use:   "beaver",
   Short: "Set up remote development environment",
   Long: `biever v1.0
     

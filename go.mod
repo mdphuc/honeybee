@@ -1,4 +1,4 @@
-module github.com/mdphuc/biever
+module github.com/mdphuc/beaver
 
 go 1.21.3
 

@@ -1,7 +1,7 @@
 
 package main
 
-import "github.com/mdphuc/biever/cmd"
+import "github.com/mdphuc/beaver/cmd"
 
 func main() {
   cmd.Execute()
