@@ -54,9 +54,18 @@ var resetCmd = &cobra.Command{
 					if docker == true{
 						dockerstop := exec.Command("docker", "stop", container_id)
 						dockerprune := exec.Command("docker", "system", "prune")
+						dockerrmi := exec.Command("docker","rmi",dir_name)
 
+						blue.Print("==> [In Progress] ")
+						white.Print("Deleting the environment...\n")		
 						_ = dockerstop.Run()
+						_ = dockerrmi.Run()
 						_ = dockerprune.Run()
+						_ = dockerprune.Run()
+						
+						green.Print("==> [Success] ")
+						white.Print(fmt.Sprintf("Deletion complete\n"))
+	
 					}else{
 						credentials, err := os.ReadFile("./credential.log. Please add <username>@<ip> to the first line of credential.log\n")
 						if err == nil{
@@ -65,10 +74,19 @@ var resetCmd = &cobra.Command{
 							dockerrm := exec.Command("docker", "exec", "-it", container_id, "sh", "-c", reset_command)
 							dockerstop := exec.Command("docker", "stop", container_id)
 							dockerprune := exec.Command("docker", "system", "prune")
-		
+							dockerrmi := exec.Command("docker","rmi",dir_name)
+							
+							blue.Print("==> [In Progress] ")
+							white.Print("Resetting the environment...\n")			
 							_ = dockerrm.Run()
 							_ = dockerstop.Run()
+							_ = dockerrmi.Run()
 							_ = dockerprune.Run()
+							_ = dockerprune.Run()
+
+							green.Print("==> [Success] ")
+							white.Print(fmt.Sprintf("Reset complete\n"))
+	
 		
 						}else{
 							red.Print("==> [Error] ")

@@ -153,7 +153,7 @@ func RemoteMachine(ip string, username string, compose bool, connect bool){
 				}
 			}else{
 				red.Print("==> [Error] ")
-				white.Print("The environment already up")		
+				white.Print("The environment already up\n")		
 			}
 		}else{
 			red.Print("==> [Error] ")

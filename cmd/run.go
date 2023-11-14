@@ -45,8 +45,8 @@ func GetDirectoryName() string{
 
 func GetContainerID(dir_name string) string {
 	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
-	output, err := cmd.CombinedOutput()
-	if err != nil{
+	output, _ := cmd.CombinedOutput()
+	if string(output) != ""{
 		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
 		return container_id
 	}

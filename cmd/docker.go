@@ -40,7 +40,7 @@ var supported_pkg = []string{"apt", "dnf", "yum", "zypper", "pacman"}
 // dockerCmd represents the docker command
 var dockerCmd = &cobra.Command{
 	Use:   "docker",
-	Short: "Set up the environemnt in Docker Container",
+	Short: "Set up the environment in Docker Container",
 	Run: func(cmd *cobra.Command, args []string) {
 		environment, _ := cmd.Flags().GetString("environment")
 		pkgmanager, _ := cmd.Flags().GetString("pkgmanager")
@@ -142,7 +142,14 @@ pacman:
 				}
 			}else{
 				red.Print("==> [Error] ")
-				white.Print("The environment already up")		
+				white.Print("The environment already up\n")		
+				dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
+				dockerexec.Stdin = os.Stdin
+				dockerexec.Stdout = os.Stdout
+				dockerexec.Stderr = os.Stderr
+			
+				_ = dockerexec.Run()
+
 			}
 		}else{
 			red.Print("==> [Error] ")
@@ -186,7 +193,14 @@ pacman:
 					_ = dockerfile_rm.Run()
 				}else{
 					red.Print("==> [Error] ")
-					white.Print("The environment already up")		
+					white.Print("The environment already up\n")	
+					dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
+					dockerexec.Stdin = os.Stdin
+					dockerexec.Stdout = os.Stdout
+					dockerexec.Stderr = os.Stderr
+				
+					_ = dockerexec.Run()
+	
 				}
 
 			}		
@@ -224,8 +238,14 @@ pacman:
 					_ = dockerfile_rm.Run()
 				}else{
 					red.Print("==> [Error] ")
-					white.Print("The environment already up")		
-	
+					white.Print("The environment already up\n")		
+					dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
+					dockerexec.Stdin = os.Stdin
+					dockerexec.Stdout = os.Stdout
+					dockerexec.Stderr = os.Stderr
+				
+					_ = dockerexec.Run()
+
 				}
 			}
 		}
