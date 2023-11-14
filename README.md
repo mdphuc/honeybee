@@ -32,7 +32,7 @@ enivronment like docker or proxy server to use
 remote machine or cloud machine as development environment
 
 Usage:
-  biever [command]
+  beaver [command]
 
 Available Commands:
   help        Help about any command
@@ -43,7 +43,7 @@ Flags:
   -h, --help      help for biever
   -v, --version   version for biever
 
-Use "biever [command] --help" for more information about a command.
+Use "beaver [command] --help" for more information about a command.
 ```
 - beaver run
 ```
