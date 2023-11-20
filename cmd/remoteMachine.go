@@ -121,7 +121,7 @@ func RemoteMachine(ip string, username string, compose bool, connect bool){
 					_,_ = file.WriteString(write17)
 
 					dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
-					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
 					dockerfile_rm := exec.Command("rm", "Dockerfile")				
 
 					blue.Print("==> [In Progress] ")

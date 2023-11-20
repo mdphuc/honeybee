@@ -119,7 +119,7 @@ pacman:
 
 				blue.Print("==> [In Progress] ")
 				white.Print("Starting the environment...\n")
-				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
 
 				_, err_build := dockerbuild.CombinedOutput()
 				if err_build == nil{
@@ -169,7 +169,7 @@ pacman:
 					workdir := fmt.Sprintf("/%v", dir_name)		
 
 					dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name), "--quite")
-					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
 					dockerfile_rm := exec.Command("rm", "Dockerfile")				
 
 					blue.Print("==> [In Progress] ")
@@ -214,7 +214,7 @@ pacman:
 					workdir := fmt.Sprintf("/%v", dir_name)
 
 					dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
-					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name)
+					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
 					dockerfile_rm := exec.Command("rm", "Dockerfile")				
 
 					blue.Print("==> [In Progress] ")
