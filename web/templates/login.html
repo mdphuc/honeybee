@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='login.css')}}">
+</head>
+<body>
+  <div class="container">
+    <div style="width: 100%; height: 20px; background-color: red; text-align: center;" id="message">{{message}}</div>
+    {% if message == "" %}
+      <script>document.getElementById('message').style.display = 'none'</script>
+    {% else %}
+      <script>document.getElementById('message').style.display = 'block'</script>
+    {% endif %}
+    <h1>Login</h1>
+    <form action="#" method="POST">
+      <input type="text" placeholder="username" class="field" name="uname">
+      <input type="password" placeholder="password" class="field" name="password">
+      <input type="submit" value="login" class="btn" name="submit">
+    </form>
+    <div class="pass-link">
+      <a href="#" >Lost your password?</a>
+    </div>	
+  </div>
+</body>

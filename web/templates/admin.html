@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='codeeditor.css')}}">
+</head>
+<body>
+  <style>
+    .flex {
+      display: flex;
+      flex-direction: row;
+    }
+
+    .split1 {
+      height: 100%;
+      width: 30%;
+      position: fixed;
+      z-index: 1;
+      top: 0;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      padding-top: 20px;
+      border-right: 2px solid black;
+    }
+
+    .split2 {
+      height: 100%;
+      width: 70%;
+      position: fixed;
+      z-index: 1;
+      top: 0;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      padding-top: 20px;
+    }
+
+    .left {
+      left: 0;
+      
+    }
+
+    .right {
+      right: 0;
+      
+    }
+
+    code {
+      background-color: black;
+      color: white;
+      padding-left: 8px;
+      padding-right: 8px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+      font-weight: bold;
+      max-width: 90%;
+      border-radius: 4px;
+      font-size: 110%;
+    }
+
+    .flash-container {
+      display: flex;
+      align-items: center;
+      margin-top: 16px;
+      min-height: 30px;
+
+    }
+
+    .copied {
+      display: none;
+      margin-left: 10px;
+      padding: 5px 12px;
+      background-color: #000000df;
+      border-radius: 4px;
+      color: #fff;
+    }
+
+    .table{
+      border-spacing: 1;
+      margin: 1rem;
+      background-color: #f5f5f5;
+      width: 95%;
+    }
+
+    .table_row:nth-child(even){
+      background-color: #e5e5e5;
+    }
+
+    .table_header {
+      text-align: left;
+
+    }
+
+    .table_cell {
+      padding: 8px;
+    }
+
+  </style>
+  <div class="flex">
+    <div class="split2 right">
+      <div style="margin-left: 40px;">
+        <!-- <div id="shell">
+          <iframe src="http://localhost:5500" style="width: 90%; height: 300px;"></iframe>
+        </div> -->
+        <div id="option">
+          {% if access == "true" %}
+            <div id="dockerimages">
+              <table class="table">
+                <tr class="table_header">
+                  {% for header in headers %}
+                    <th class="table_cell">{{header}}</th>
+                  {% endfor %}
+                </tr>
+                {% for j in range (0, data|length) %}
+                  <tr class="table_row" id="data_set">
+                    {% for i in range (0, data[j]|length) %}
+                      {% if i == 1 %}
+                        {% if data[j][1] == "UP" %}
+                          <td class="table_cell" id="{{j}}{{i}}"><span style="color: #32CD32">●</span></td>
+                        {% elif data[j][1] == "DOWN" %}
+                          <td class="table_cell" id="{{j}}{{i}}"><span style="color: red">●</span></td>
+                        {% else %}
+                          <td class="table_cell" id="{{j}}{{i}}">{{data[j][1]}}</td>
+                        {% endif %}
+                      {% else %}
+                        {% if data[j][i] is sameas true or data[j][i] is sameas false %}
+                          {% if data[j][i] == True %}
+                            <td class="table_cell" id="{{j}}{{i}}" onclick="check_access('{{ j }}', '{{ i }}', '{{data[j][0]}}')">
+                              <input type="checkbox" id="active{{j}}{{i}}" name="active" checked>
+                            </td>
+                          {% else %}
+                            <td class="table_cell" id="{{j}}{{i}}" onclick="check_access('{{ j }}', '{{ i }}', '{{data[j][0]}}')">
+                              <input type="checkbox" id="active{{j}}{{i}}" name="active">
+                            </td>
+                          {% endif %}
+                        {% else %}
+                          <td class="table_cell" id="{{j}}{{i}}">{{data[j][i]}}</td>
+                        {% endif %}
+                      {% endif %}
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </table>  
+            </div>
+          {% endif %}
+        </div>
+        <p style="color: black; font-weight: bold;">Message:</p>
+        <div id="message_"></div>
+        <p style="color: black; font-weight: bold;">Error log:</p>
+        <ul>
+          {% for i in range (0, logs|length) %}
+            <li style="width: 90%;">{{logs[i]}}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="split1 left">
+      <div style="margin-left: 30px; margin-top: -10px;">
+        <h1>Honeybee</h1>
+        <form action="{{url_for('logout')}}" method="post">
+          <input type="submit" value="Logout">
+        </form>
+        <img src="{{url_for('static',filename='honeybee.png')}}" style="width: 70%">
+
+        <br>
+        <br>
+        <!-- <label for="modes">Choose a mode</label>
+        <select name="modes" id="modes">
+          <option value="" id="blank_" selected="selected"></option>
+          <option value="listuser" id="user">List User</option>
+          <option value="dockerimages" id="docker images">List Docker images</option>
+        </select> -->
+        <!-- <br><br> -->
+        <script>
+          function checkAccess_(form){
+            let key = prompt("Key:")
+            if (key == null){
+              return
+            }
+            submit_form = document.getElementById(form)
+            input = document.createElement('input')
+            input.type = 'TEXT'
+            input.name = 'key'
+            input.value = key
+            submit_form.appendChild(input)
+            submit_form.submit()
+            submit_form.removeChild(input)
+          }
+        </script>
+        <script>
+          function getKey(){
+            let key = prompt("Password:")
+            if (key == null){
+              return
+            }
+            let entry = {
+              "key" : key
+            }
+            fetch(`${window.origin}/getKey`, {
+              method: 'POST',
+              body: JSON.stringify(entry),
+              cache: "no-cache",
+              headers: new Headers({
+                "content-type" : "application/json"
+              })
+            }).then(function(response){
+              if (response.status !== 200){
+                console.log(`Failed : ${response.status}`)
+                return
+              }
+
+              response.json().then(function(data){
+                document.getElementById("KEY").value = data["key"]
+              })
+            })
+
+          }
+        </script>
+        <button onclick="getKey()">Show key</button><input id="KEY" style="margin-left: 15px;" readonly>
+        <br><br>
+        <form action="{{url_for('home', type='user')}}" method="post" id="listuser"></form>
+        <button onclick="checkAccess_('listuser')">List User</button>
+        <br><br>
+        <form action="{{url_for('home', type='docker')}}" method="post" id="dockerimages"></form>
+        <button onclick="checkAccess_('dockerimages')">List Docker Images</button>
+        <script>
+          document.getElementById("user_submit").addEventListener("click", () => {
+            if (document.getElementById("key_user").value != ""){
+              document.getElementById("listuser").submit()
+            }else{
+              document.getElementById("message_").innerHTML = "<p style='color: red; font-weight: bold'>Key is blank</p>"
+            }
+          })
+          document.getElementById("docker_submit").addEventListener("click", () => {
+            if (document.getElementById("key_docker").value != ""){
+              document.getElementById("dockerimages").submit()
+            }else{
+              document.getElementById("message_").innerHTML = "<p style='color: red; font-weight: bold'>Key is blank</p>"
+            }
+          })
+
+        </script>
+        <br><br>
+        <button onclick="tableToCSV()">Export to .csv</button>
+        <br><br>
+        <button onclick="addUser('user_file_form')">Add user</button>
+        <br><br>
+        <form action="{{url_for('register')}}" id="user_file_form" method="post" enctype="multipart/form-data">
+          <label for="user_file">User file: </label>
+          <input type="file" id="user_file" name="user_file"/>   
+        </form>
+        <script src="{{url_for('static', filename='addUser.js')}}"></script>
+        <script>
+          function tableToCSV(){
+            
+            // Variable to store the final csv data
+            let csv_data = [];
+
+            // Get each row data
+            let rows = document.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+
+                // Get each column data
+                let cols = rows[i].querySelectorAll('td,th');
+
+                // Stores each csv row data
+                let csvrow = [];
+                for (let j = 0; j < cols.length; j++) {
+
+                    // Get the text data of each cell of
+                    // a row and push it to csvrow
+                    csvrow.push(cols[j].innerHTML);
+                }
+
+                // Combine each column value with comma 
+                csv_data.push(csvrow.join(","));
+            }
+            // Combine each row data with new line character
+            csv_data = csv_data.join('\n');
+
+            downloadCSVFile(csv_data, "file");
+            
+
+            /* We will use this function later to download
+            the data in a csv file downloadCSVFile(csv_data);
+            */
+          }
+
+          function downloadCSVFile(csv_data, name) {
+ 
+            // Create CSV file object and feed our
+            // csv_data into it
+            CSVFile = new Blob([csv_data], { type: "text/csv" });
+
+            // Create to temporary link to initiate
+            // download process
+            let temp_link = document.createElement('a');
+
+            // Download csv file
+            temp_link.download = `${name}.csv`;
+            let url = window.URL.createObjectURL(CSVFile);
+            temp_link.href = url;
+
+            // This link should not be displayed
+            temp_link.style.display = "none";
+            document.body.appendChild(temp_link);
+
+            // Automatically click the link to trigger download 
+            temp_link.click();
+            document.body.removeChild(temp_link);
+          }
+        </script>
+
+        <br><br>
+        <br><br>
+
+        
+        <p style="color: red; font-weight: bold;">Caution!</p>
+        <ul>
+          <li>Exercise at your own risk</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <script src="{{url_for('static', filename='fetch.js')}}"></script>
+    <script src="{{url_for('static', filename='check_access.js')}}"></script>
+    <script>
+      window.onload = function(){
+        if (window.location.pathname === "/docker"){
+          console.log("Initiate")
+          get_status()
+        }
+      }
+    </script>
+    <!-- <script async src="{{url_for('static', filename='fetch.js')}}">
+      get_status()
+    </script> -->
+
+</body>
+</html>

@@ -18,11 +18,13 @@ package cmd
 import (
   "fmt"
   "os"
+  "os/exec"
   "github.com/spf13/cobra"
-
+  "log"
   homedir "github.com/mitchellh/go-homedir"
   "github.com/spf13/viper"
-
+  "strings"
+  // "bytes"
 )
 
 
@@ -50,7 +52,7 @@ remote machine or cloud machine as development environment
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
   if err := rootCmd.Execute(); err != nil {
-    fmt.Println(err)
+    initLog(fmt.Sprintf("%v", err))
     os.Exit(1)
   }
 }
@@ -59,6 +61,23 @@ func init() {
   cobra.OnInitialize(initConfig)
 }
 
+func initLog(err string) {
+  mkdir_run := exec.Command("mkdir", "./log")
+
+  _ = mkdir_run.Run()
+  err1 := strings.Split(err, "\n")[0]
+
+  logFile, err_log := os.OpenFile("./log/app.log", os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+  log.SetOutput(logFile)
+  log.SetFlags(log.Lshortfile | log.LstdFlags | log.LUTC) 
+
+  log.Println("UTC: " + fmt.Sprintf("%v",err1))  
+
+
+  if err_log != nil{
+    log.Println("UTC: " + fmt.Sprintf("%v",err_log))
+  }
+}
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
@@ -73,9 +92,9 @@ func initConfig() {
       os.Exit(1)
     }
 
-    // Search config in home directory with name ".biever" (without extension).
+    // Search config in home directory with name ".beaver" (without extension).
     viper.AddConfigPath(home)
-    viper.SetConfigName(".biever")
+    viper.SetConfigName(".beaver")
   }
 
   viper.AutomaticEnv() // read in environment variables that match

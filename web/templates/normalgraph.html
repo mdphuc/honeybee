@@ -1,0 +1,16 @@
+<body onload="run()" style="display: none;" id="body">
+  {% if graph == "true" %}
+    {% include 'nodes.html' %}
+  {% endif %}
+</body>  
+
+
+<script>
+  function run(){
+    if (window.self == window.top){
+      window.location.href = "http://127.0.0.1:5500/403"
+    }else{
+      document.getElementById("body").style.display = "block"
+    }
+  }
+</script>

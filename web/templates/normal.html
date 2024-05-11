@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="lib/bindings/utils.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+    crossorigin="anonymous"
+  ></script>
+
+
+        
+  <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+  <!-- {% if graph == "true" %}
+    <script>
+      $(function() {
+          $("#mygraph").load("./static/nodes.html");
+      });
+    </script>
+  {% endif %} -->
+
+  <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='codeeditor.css')}}">
+  <!-- <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+  <script>
+    $(function() {
+      $("#test").load("./test.html")
+    })
+  </script> -->
+  <style>
+    #mynetwork {
+      width: 100%;
+      height: 300px;
+      background-color: #222222;
+      border: 1px solid lightgray;
+      position: relative;
+      float: left;
+    }
+  .flex {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .split1 {
+    height: 100%;
+    width: 30%;
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    padding-top: 20px;
+    border-right: 2px solid black;
+  }
+
+  .split2 {
+    height: 100%;
+    width: 70%;
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    padding-top: 20px;
+  }
+
+  .left {
+    left: 0;
+    
+  }
+
+  .right {
+    right: 0;
+    
+  }
+
+  code {
+    background-color: black;
+    color: white;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-weight: bold;
+    max-width: 90%;
+    border-radius: 4px;
+    font-size: 110%;
+  }
+
+  .flash-container {
+    display: flex;
+    align-items: center;
+    margin-top: 16px;
+    min-height: 30px;
+
+  }
+
+  .copied {
+    display: none;
+    margin-left: 10px;
+    padding: 5px 12px;
+    background-color: #000000df;
+    border-radius: 4px;
+    color: #fff;
+  }
+
+  .table{
+    border-spacing: 1;
+    margin: 1rem;
+    background-color: #f5f5f5;
+    width: 95%;
+  }
+
+  .table_row:nth-child(even){
+    background-color: #e5e5e5;
+  }
+
+  .table_header {
+    text-align: left;
+
+  }
+
+  .table_cell {
+    padding: 8px;
+  }
+
+</style>
+</head>
+<body>
+  <div id="fullscreen" style="z-index: 9; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: white; display: none;">
+    <button onclick="document.getElementById('fullscreen').style.display = 'none'" style="margin-left: 25px;">Minimize</button>
+    {% if graph == "true" %}
+      <iframe src="{{url_for('home', type='graph')}}" style="width: 100%; height: 100%; border: transparent;" id="graph_network"></iframe>
+    {% endif %}
+  </div>
+  <div class="flex">
+    <div class="split2 right">
+      <div style="margin-left: 40px;">
+        <div id="option">
+          {% if access == "true" %}
+            <div id="dockerimages">
+              <table class="table">
+                <tr class="table_header">
+                  {% for header in headers %}
+                    <th class="table_cell">{{header}}</th>
+                  {% endfor %}
+                </tr>
+                {% for j in range (0, data|length) %}
+                  <tr class="table_row" id="data_set">
+                    {% for i in range (0, data[j]|length) %}
+                      {% if i == 1 %}
+                        {% if data[j][1] == "UP" %}
+                          <td class="table_cell" id="{{j}}{{i}}"><span style="color: #32CD32">●</span></td>
+                        {% elif data[j][1] == "DOWN" %}
+                          <td class="table_cell" id="{{j}}{{i}}"><span style="color: red">●</span></td>
+                        {% else %}
+                          <td class="table_cell" id="{{j}}{{i}}">{{data[j][1]}}</td>
+                        {% endif %}
+                      {% elif i == 2 %}
+                        {% if data[j][1] == "UP" %}
+                          <td class="table_cell" id="{{j}}{{i}}">
+                            <a href="javascript:void(0);" onclick="ttyd('{{data[j][i]}}')">{{data[j][i]}}</a>
+                          </td>
+                        {% else %}
+                          <td class="table_cell" id="{{j}}{{i}}">
+                            {{data[j][i]}}
+                          </td>
+                        {% endif %}
+                      {% elif i == 9%}
+                        {% if data[j][i] != "null" %}
+                          <td class="table_cell" id="{{j}}{{i}}">
+                            <a href="javascript:void(0);" onclick="expose_port('{{data[j][i]}}','{{data[j][2]}}')">{{data[j][i]}}</a>
+                          </td>      
+                        {% else %}
+                          <td class="table_cell" id="{{j}}{{i}}">
+                            {{data[j][i]}}
+                          </td>      
+                        {% endif %}
+                      {% else %}
+                        <td class="table_cell" id="{{j}}{{i}}">{{data[j][i]}}</td>
+                      {% endif %}
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </table>  
+            </div>
+          {% endif %}
+        </div>
+        <script src="{{url_for('static', filename='ttyd.js')}}"></script>
+        <script src="{{url_for('static', filename='expose_port.js')}}"></script>
+        <button id="ttyd_close" onclick="document.getElementById('ttyd').style.display = 'none'; document.getElementById('ttyd_close').style.display = 'none'" style="font-size: large; display: none">-</button>
+        <div id="ttyd" style="display: none; width: 90%; margin-left: 40px;">
+          <br><br><br>
+        </div>
+        <!-- <iframe src="http://127.0.0.1:2005"></iframe> -->
+        <div id="port_divv"></div>
+        {% if graph == "true" %}
+          <div id="network_graph">
+            <button onclick="document.getElementById('fullscreen').style.display = 'block'">Enlarge</button>
+            <button onclick="document.getElementById('graph_network').style.display = 'none'; document.getElementById('network_graph').style.display = 'none'">Close</button>
+
+            <iframe src="{{url_for('home', type='graph')}}" style="width: 93%; height: 500px; margin-left: 25px; border: transparent;" id="graph_network"></iframe>
+          </div>
+        {% endif %}
+        <p style="color: black; font-weight: bold;">Message:</p>
+        <div id="message_"></div>
+
+        <div id="dockerfile-write" style="display: none;" class="container">
+          <p>Dockerfile editor</p>
+          <div class="editor">
+            <form action="{{url_for('nodockerfile')}}" method="post" enctype = "multipart/form-data" id="nodockerfile-form">
+              <textarea style="width: 90%; margin-left: 15px; white-space: pre" name="dockerfile-edit" id="editor" ></textarea>
+            </form>
+          </div>
+        </div>
+        <p style="color: black; font-weight: bold;">Error log:</p>
+        <ul>
+          {% for log in logs %}
+            <li style="width: 90%;">{{log}}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="split1 left">
+      <div style="margin-left: 30px; margin-top: -10px;">
+        <h1>Honeybee</h1>
+        <form action="{{url_for('logout')}}" method="post">
+          <input type="submit" value="Logout">
+        </form>
+        <img src="{{url_for('static',filename='honeybee.png')}}" style="width: 70%">
+        <script>
+          var getImport = document.querySelector('#test_html');
+          var getContent = getImport.import.querySelector('#content');
+          document.getElementById("test").appendChild(document.importNode(getContent, true))
+        </script>
+        <script>
+          function getKey(){
+            let key = prompt("Password:")
+            if (key == null){
+              return
+            }
+            let entry = {
+              "key" : key
+            }
+            fetch(`${window.origin}/getKey`, {
+              method: 'POST',
+              body: JSON.stringify(entry),
+              cache: "no-cache",
+              headers: new Headers({
+                "content-type" : "application/json"
+              })
+            }).then(function(response){
+              if (response.status !== 200){
+                console.log(`Failed : ${response.status}`)
+                return
+              }
+
+              response.json().then(function(data){
+                document.getElementById("KEY").value = data["key"]
+              })
+            })
+
+          }
+        </script>
+        <br><br>
+        <button onclick="getKey()">Show key</button><input id="KEY" style="margin-left: 15px;" readonly>
+        <br>
+        <br>
+        <label for="modes">Choose a mode</label>
+        <select name="modes" id="modes">
+          <option value="" id="blank_" selected="selected"></option>
+          <option value="Set up Web Server" id="docker">Docker</option>
+          <option value="Set up Manager for Web Server" id="remotemachine">Remote machine</option>
+        </select>
+        <br><br>
+        <form action="{{url_for('home', type='docker')}}" id="userlistdocker" method="post"></form>
+        <label for="env">Choose Existed Environment</label>
+        <input type="checkbox" id="env" name="env" onclick="check_status_user('userlistdocker')">
+        <br>
+        <br>
+        <form action="{{url_for('home', type='docker_graph')}}" id="graph" method="post"></form>
+        <label for="graph">Get graph</label>
+        <input type="checkbox" id="graph" name="graph" onclick="check_status_user('graph')">
+        <br><br>
+        <div id="setup" style="display: none" >
+          <label for="terminal">Build from customed Dockerfile</label>
+          <input type="checkbox" id="dockerfile_check" name="terminal">
+          <br><br>
+          <label for="terminal">Build not using Dockerfile</label>
+          <input type="checkbox" id="nodockerfile_check" name="terminal">      
+          <script>
+            document.getElementById("nodockerfile_check").checked = false;
+            document.getElementById("nodockerfile_check").addEventListener("change", function(){
+              if(document.getElementById("nodockerfile_check").checked) {
+                document.getElementById("dockerfile").style.display = "block"
+                document.getElementById("nodockerfile").style.display = "none"
+                document.getElementById("dockerfile-write").style.display = "none"
+                document.getElementById("dockerfile_check").checked = false
+              }else{
+                document.getElementById("dockerfile").style.display = "none"
+              }
+            })
+
+            document.getElementById("dockerfile_check").checked = false;
+            document.getElementById("dockerfile_check").addEventListener("change", function(){
+              if(document.getElementById("dockerfile_check").checked) {
+                document.getElementById("nodockerfile").style.display = "block"
+                document.getElementById("dockerfile-write").style.display = "block"
+                document.getElementById("dockerfile").style.display = "none"
+                document.getElementById("nodockerfile_check").checked = false
+              }else{
+                document.getElementById("nodockerfile").style.display = "none"
+                document.getElementById("dockerfile-write").style.display = "none"
+              }
+            })
+          </script>   
+        </div>
+        <script src="{{url_for('static', filename='check_status_user.js')}}"></script>
+        
+        <div id="nodockerfile" style="display: none; margin-left: 30px;">
+          <br>
+          <label for="dockerfile_upload">Upload Dockerfile:</label>
+          <input type="file" id="dockerfile_upload" name="dockerfile_upload"/>   
+          <br><br>
+          <input type="submit" value="Submit" id="nodockerfile_submit">
+          <script>
+            document.getElementById("nodockerfile_submit").addEventListener("click", () => {
+              check_status_user("nodockerfile-form")
+            })
+
+          </script>
+          <script>
+            document.getElementById('dockerfile_upload').addEventListener('change', getFile)
+
+            function getFile(event) {
+              const input = event.target
+              if ('files' in input && input.files.length > 0) {
+                placeFileContent(
+                  document.getElementById('editor'),
+                  input.files[0])
+              }
+            }
+
+            function placeFileContent(target, file) {
+              readFileContent(file).then(content => {
+                target.value = content
+              }).catch(error => console.log(error))
+            }
+
+            function readFileContent(file) {
+              const reader = new FileReader()
+              return new Promise((resolve, reject) => {
+                reader.onload = event => resolve(event.target.result)
+                reader.onerror = error => reject(error)
+                reader.readAsText(file)
+              })
+            }
+          </script>
+        </div> 
+        <div id="dockerfile" style="display: none; margin-left: 30px;">
+          <br>
+          <form action="{{url_for('dockerfile')}}" method="post" enctype = "multipart/form-data" id="setup-form">
+            <label for="name">Name</label><br>
+            <input id="name" name="name">
+            <br>
+            <br>
+            <label for="environment">Environment</label><br>
+            <input id="environment" name="environment">
+            <br>
+            <br>
+            <label for="pkgmanager" title="Support apt, dnf, yum, zypper">Package Manager</label><br>
+            <input id="pkgmanager" name="pkgmanager">
+            <br><br>
+            <label for="distro" title="Support Ubuntu, Debian, Fedora, openSUSE">Distro</label><br>
+            <input id="distro" name="distro">
+            <br><br>
+            <label for="library" title="Separate by comma">Library</label><br>
+            <input id="library" name="library">
+            <br><br>
+            <label for="port" title="Separate by comma">Port</label><br>
+            <input id="port" name="port">
+            <br><br>
+            <label for="network">Network advance</label>
+            <input type="checkbox" id="network" name="network">   
+            <br><br>
+            <div id="network_div" style="display: none;">
+              <label for="network_name" id="network_name_title">Network name</label><br>
+              <input id="network_name" name="network_name">
+              <br><br>  
+              <label for="driver" id="driver_title">Driver</label><br>
+              <input id="driver" name="driver">
+              <br><br>  
+              <label for="subnet" id="subnet_title">Subnet</label><br>
+              <input id="subnet" name="subnet">
+              <br><br> 
+              <label for="getway" id="gateway_title">Gateway</label><br>
+              <input id="gateway" name="gateway">
+              <br><br>  
+              <label for="ip" id="ip_title">IP</label><br>
+              <input id="ip" name="ip">
+              <br><br>      
+            </div>  
+          </form>
+          <button onclick="check_status_user('setup-form')">Submit</button>
+          <script>
+            document.getElementById("network").addEventListener("click", function(){
+              if (document.getElementById("network").checked == true){
+                document.getElementById("network_div").style.display = "block"
+              }else{
+                document.getElementById("network_div").style.display = "none"
+              }
+            })
+          </script>
+        </div>
+
+        <div id="manage" style="display: none;">
+
+        </div>
+        <br>
+        
+        <form action="/index" method="get" id="refresh_form"></form>
+        <input type="submit" value="Refresh" id="refresh">
+        
+
+        <p style="color: red; font-weight: bold;">Caution!</p>
+        <ul>
+          <li>Exercise at your own risk</li>
+        </ul>
+        <div id="processing" style="display: none;">
+          <p style="font-weight: bold; color:blue">Processing...</p>
+        </div>
+        {% if color == 'red' %}
+          <p style="font-weight: bold; color:red">{{message}}</p>
+        {% endif %}
+        {% if color == 'green' %}
+          <p style="font-weight: bold; color:green">{{message}}</p>
+        {% endif %}
+        <script>
+          document.getElementById("submit_setup").addEventListener("click", function(){
+            document.getElementById("processing").style.display = "block"
+          })
+
+          document.getElementById("submit_setup").addEventListener("click", function(){
+            if(document.getElementById("domain") != ""){
+              var overwrite = prompt("Domain name will default be used for name of directory for main website code and name of nginx conf file. Do you want to overwrite? (yes or no)")
+              while (overwrite != "yes" && overwrite != "no"){
+                var overwrite = prompt("Wrong input! The answer should be yes or no.\nDomain name will default be used for name of directory for main website code and name of nginx conf file. Do you want to overwrite? (yes or no)")
+              }
+              if(overwrite == "yes"){
+                document.getElementById("webdir").value = document.getElementById("domain").value
+                document.getElementById("nginx").value = document.getElementById("domain").value
+                document.getElementById("setup-form").submit()
+              }else{
+                document.getElementById("setup-form").submit()
+              }
+            }else{
+              document.getElementById("setup-form").submit()
+            }
+          })
+
+          document.getElementById("refresh").addEventListener("click", function(){
+            var proceed = prompt("Do you want to refresh? (yes or no)")
+            while(proceed != "yes" && proceed != "no"){
+              var proceed = prompt("Wrong input! The answer should be yes or no.\nDo you want to refresh? (yes or no)")
+            }
+            if(proceed == "yes"){
+              document.getElementById("refresh_form").submit()
+            }
+          })
+        </script>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById("blank_").addEventListener("click", function(){
+      document.getElementById("setup").style.display = "none"
+      document.getElementById("manage").style.display = "none"
+    })
+
+    document.getElementById("docker").addEventListener("click", function(){
+      document.getElementById("setup").style.display = "block"
+      document.getElementById("manage").style.display = "none"
+    })
+
+    document.getElementById("remotemachine").addEventListener("click", function(){
+      document.getElementById("setup").style.display = "none"
+      document.getElementById("manage").style.display = "block"
+    })
+  </script>
+
+  <script>
+    function Copy(copy_id, flash_id, tag){
+      if (tag == "p") {
+        var copyText = document.getElementById(copy_id)
+        var elem = document.createElement("textarea")
+        document.body.appendChild(elem)
+        elem.value = copyText.innerHTML
+        elem.select()
+        navigator.clipboard.writeText(elem.value)
+        document.getElementById(`copied${flash_id}`).style.display = "inline"
+        document.body.removeChild(elem)
+        setTimeout( function() {
+            document.getElementById(`copied${flash_id}`).style.display = "none"
+        }, 2000)
+      }else if (tag == "txtarea") {
+        var copyText = document.getElementById(copy_id)
+        copyText.select()
+        navigator.clipboard.writeText(copyText.value)
+        document.getElementById(`copied${flash_id}`).style.display = "inline"
+        setTimeout( function() {
+            document.getElementById(`copied${flash_id}`).style.display = "none"
+        }, 2000)
+      } 
+    }
+  </script>
+
+</body>
+</html>

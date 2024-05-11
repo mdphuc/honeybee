@@ -17,7 +17,7 @@ package cmd
 
 import (
 	"fmt"
-
+	"bytes"
 	"github.com/spf13/cobra"
 	"github.com/fatih/color"
 	"os/exec"
@@ -25,8 +25,15 @@ import (
 	// "slices"
 	// "encoding/base64"
 	"os"
+	"strconv"
 
 )
+
+type Flag struct{
+	flag string
+	name string
+	iter int
+}
 
 var red = color.New(color.FgRed, color.Bold)
 var white = color.New(color.FgWhite, color.Bold)
@@ -35,7 +42,7 @@ var blue = color.New(color.FgBlue, color.Bold)
 
 var supported_distro = []string{"ubuntu", "debian", "fedora", "opensuse"}
 
-var supported_pkg = []string{"apt", "dnf", "yum", "zypper", "pacman"}
+var supported_pkg = []string{"apt", "dnf", "yum", "zypper"}
 
 // dockerCmd represents the docker command
 var dockerCmd = &cobra.Command{
@@ -48,23 +55,41 @@ var dockerCmd = &cobra.Command{
 		distro,_ := cmd.Flags().GetString("distro")
 		os_ := cmd.Flags().Lookup("os").Changed
 		build,_ := cmd.Flags().GetString("build")
+		port,_ := cmd.Flags().GetString("port")
+		name,_ := cmd.Flags().GetString("name")
+		network,_ := cmd.Flags().GetString("network")
+		driver,_ := cmd.Flags().GetString("driver")
+		subnet,_ := cmd.Flags().GetString("subnet")
+		gateway,_ := cmd.Flags().GetString("gateway")
+		ip,_ := cmd.Flags().GetString("ip")
 
 		check_docker := exec.Command("docker", "network", "ls")
-		_, err := check_docker.CombinedOutput()
+		var stderr_check_docker bytes.Buffer
+		check_docker.Stderr = &stderr_check_docker
+
+		err := check_docker.Run()
+		
 
 		if err != nil {
 			red.Print("==> [Error] ")
 			white.Print("Docker not running\n")
+			initLog("docker.go " + string(stderr_check_docker.Bytes()))
 		}else{
 			if environment == "" && pkgmanager == "" && library == "" && os_ == false && distro == "" && build == ""{
 				red.Print("==> [Error] ")
 				white.Print("Missing flag\n")
 			}else{
-				Docker(environment, pkgmanager, library, os_, distro, build)
+				Network(name, network, driver, subnet, gateway, ip)
+				if port != ""{
+					checkport := CheckPort(port)
+					if checkport == true{
+						Docker(environment, pkgmanager, library, os_, distro, build, port, name)
+					}
+				}else{
+					Docker(environment, pkgmanager, library, os_, distro, build, port, name)
+				}
 			}		
 		}
-
-
 	},
 }
 
@@ -77,10 +102,78 @@ func init() {
 	dockerCmd.PersistentFlags().String("library", "", "Library to pre-install (separate by comma)")
  	dockerCmd.PersistentFlags().BoolP("os", "", true, "Supported OS for Docker environment and their package manager")
 	dockerCmd.PersistentFlags().String("build", "", "Build docker machine using docker file")
+	dockerCmd.PersistentFlags().String("port", "", "Expose port")
+	dockerCmd.PersistentFlags().String("name", "", "Name of environment (Name of current directory by default)")
+	dockerCmd.PersistentFlags().String("network", "", "Network name (Default: name of docker image)")
+	dockerCmd.PersistentFlags().String("driver", "", "Driver (Default: bridge) (bridge, host, none, overlay, ipvlan, macvlan)")
+	dockerCmd.PersistentFlags().String("subnet", "", "Subnet")
+	dockerCmd.PersistentFlags().String("gateway", "", "Gateway")
+	dockerCmd.PersistentFlags().String("ip", "", "IP address")
 }
 
+func Network(name string, network string, driver string, subnet string, gateway string, ip string){
+	dockernetwork_slice := []Flag{}
+	dockernetwork_setup := []string{}
+	dockernetwork_name := []string{"network", "driver", "subnet", "gateway", "ip"}
+	if network == ""{
+		network = name
+	}
+	dockernetwork_flag := []string{network, driver, subnet, gateway, ip}
+	for i,s := range dockernetwork_flag{
+		if (s != ""){
+			temp Flag;
+			temp.flag = dockernetwork_name[i]
+			temp.name = s
+			temp.iter = i
+			dockernetwork_slice = append(dockernetwork_slice, temp)
+		}
+	}
+	for _,ds := range dockernetwork_slice{
+		if ds.iter != 0{
+			dockernetwork_setup = append(dockernetwork_setup, fmt.Sprintf("--%v=%v", ds.flag, ds.name))
+		}else{
+			n := ds.name
+		}
+	}
+	dockernetwork_setup = append(dockernetwork_setup, n)
+	dockernetwork := exec.Command("docker", "network", "create", dockernetwork_setup[0], dockernetwork_setup[1:]...)
 
-func Docker(environment string, pkgmanager string, library string, os_ bool, distro string, build string){
+	var stderr_dockernetwork bytes.Buffer
+	dockernetwork.Stderr = &stderr_dockernetwork
+
+	err := dockernetwork.Run()
+
+	if err != nil{
+		red.Print("==> [Error] ")
+		white.Print("Problem when setting up network\n")	
+		initLog("docker.go " + fmt.Sprintf("%v",err))
+	}
+	
+}
+
+func CheckPort(port string) bool {
+	port_ := strings.Split(port, ",")
+	for _, p := range port_{ 
+		port_int, err := strconv.Atoi(p)
+		if err != nil{
+			red.Print("==> [Error] ")
+			white.Print("Port must be a positive whole number\n")	
+			initLog("docker.go " + fmt.Sprintf("%v",err))
+			break	
+			return false
+		}else{
+			if port_int > 65535{
+				red.Print("==> [Error] ")
+				white.Print("Port out of range\n")	
+				break	
+				return false
+			} 
+		}
+	}
+	return true
+}
+
+func Docker(environment string, pkgmanager string, library string, os_ bool, distro string, build string, port string, name string){
 	if os_ == true {
 		if environment == "" && pkgmanager == "" && distro == "" && build == ""{
 			white.Println("Supported operating system for Docker environment")
@@ -97,9 +190,6 @@ yum:
 
 zypper:
 	openSUSE
-
-pacman:
-	ArchLinux
 			`)
 		}else{
 			red.Print("==> [Error] ")
@@ -107,7 +197,12 @@ pacman:
 		}
 	}else if build != ""{
 		if environment == "" && pkgmanager == "" && distro == "" && os_ == false{
-			dir_name := GetDirectoryName()
+			dir_name := ""
+			if name == ""{	
+				dir_name = GetDirectoryName()
+			}else{
+				dir_name = name
+			}
 			container_id := GetContainerID(dir_name)
 			if container_id == "Not Found"{
 				dir_mount := fmt.Sprintf(".:/%v", dir_name)
@@ -116,40 +211,60 @@ pacman:
 				blue.Print("==> [In Progress] ")
 				white.Print("Setting up environment...\n")
 				dockerbuild := exec.Command("docker", "build", build, "-t", string(dir_name), "--quite")
+				var stderr_dockerbuild bytes.Buffer
+				dockerbuild.Stderr = &stderr_dockerbuild
 
 				blue.Print("==> [In Progress] ")
-				white.Print("Starting the environment...\n")
-				dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
+				white.Print("Starting the environment...\n")				
 
-				_, err_build := dockerbuild.CombinedOutput()
+				err_build := dockerbuild.Run()
+
 				if err_build == nil{
-					_,_ = dockerrun.CombinedOutput()
+					data := Port_to_Docker(dir_name, dir_mount, workdir, port)
+					dockerrun := exec.Command(data[0], data[1:]...)
+					var stderr_dockerrun bytes.Buffer
+					dockerrun.Stderr = &stderr_dockerrun
+
+					save_name := fmt.Sprintf("./backup/%v-original.tar", dir_name)
+					dockersave := exec.Command("docker", "image", "save", "-o", save_name, dir_name)
+					var stderr_dockersave bytes.Buffer
+					dockersave.Stderr = &stderr_dockersave
+	
+					_ = dockersave.Run()
+					_ = dockerrun.Run()
+
+					initLog("docker.go " + string(stderr_dockersave.Bytes()))
+					initLog("docker.go " + string(stderr_dockerrun.Bytes()))
 
 					container_id = GetContainerID(dir_name)
 
 					green.Print("==> [Success] ")
-					white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
+					white.Print(fmt.Sprintf("The environment is running as a docker container named %v with id %v\n", dir_name, container_id))
 
 					dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
 					dockerexec.Stdin = os.Stdin
 					dockerexec.Stdout = os.Stdout
 					dockerexec.Stderr = os.Stderr
 				
-					_ = dockerexec.Run()
+					err_exec := dockerexec.Run()
+
+					initLog("docker.go " + fmt.Sprintf("%v",err_exec))
 				}else{
 					red.Print("==> [Error] ")
 					white.Print(err_build)	
+					initLog("docker.go " + string(stderr_dockerbuild.Bytes()))
 				}
 			}else{
 				red.Print("==> [Error] ")
 				white.Print("The environment already up\n")		
+				
 				dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
 				dockerexec.Stdin = os.Stdin
 				dockerexec.Stdout = os.Stdout
 				dockerexec.Stderr = os.Stderr
-			
-				_ = dockerexec.Run()
-
+				
+				err_exec := dockerexec.Run()
+				initLog("docker.go " + fmt.Sprintf("%v", err_exec))
 			}
 		}else{
 			red.Print("==> [Error] ")
@@ -162,35 +277,65 @@ pacman:
 		}else if strings.ToLower(environment) == "linux"{
 			check_flag := CheckFlag(pkgmanager, distro, library, "Linux")
 			if check_flag == true{
-				dir_name := GetDirectoryName()
+				dir_name := ""
+				if name == ""{	
+					dir_name = GetDirectoryName()
+				}else{
+					dir_name = name
+				}
 				container_id := GetContainerID(dir_name)
 				if container_id == "Not Found"{
 					dir_mount := fmt.Sprintf(".:/%v", dir_name)
 					workdir := fmt.Sprintf("/%v", dir_name)		
 
 					dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name), "--quite")
-					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
-					dockerfile_rm := exec.Command("rm", "Dockerfile")				
+					var stderr_dockerbuild bytes.Buffer
+					dockerbuild.Stderr = &stderr_dockerbuild
+
+					dockerfile_rm := exec.Command("rm", "Dockerfile")		
+					var stderr_dockerfile_rm bytes.Buffer
+					dockerfile_rm.Stderr = &stderr_dockerfile_rm
+					
+					data := Port_to_Docker(dir_name, dir_mount, workdir, port)
+					dockerrun := exec.Command(data[0], data[1:]...)
+					var stderr_dockerrun bytes.Buffer
+					dockerrun.Stderr = &stderr_dockerrun
 
 					blue.Print("==> [In Progress] ")
 					white.Print("Setting up environment...\n")
-					_, _ = dockerbuild.CombinedOutput()
+					_ = dockerbuild.Run()
+
+					initLog("docker.go " + string(stderr_dockerbuild.Bytes()))
+
+					save_name := fmt.Sprintf(fmt.Sprintf("./backup/%v-original.tar", dir_name))
+					dockersave := exec.Command("docker", "image", "save", "-o", save_name, dir_name)
+					var stderr_dockersave bytes.Buffer
+					dockersave.Stderr = &stderr_dockersave
+
+					_ = dockersave.Run()
+
 					blue.Print("==> [In Progress] ")
 					white.Print("Starting the environment...\n")
-					_ , _ = dockerrun.CombinedOutput()
+					_ = dockerrun.Run()
+
+					initLog("docker.go " + string(stderr_dockersave.Bytes()))
+					initLog("docker.go " + string(stderr_dockerrun.Bytes()))
 
 					container_id = GetContainerID(dir_name)
 
 					green.Print("==> [Success] ")
-					white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
+					white.Print(fmt.Sprintf("The environment is running as a docker container named %v with id %v\n", dir_name, container_id))
 
 					dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
 					dockerexec.Stdin = os.Stdin
 					dockerexec.Stdout = os.Stdout
 					dockerexec.Stderr = os.Stderr
 				
-					_ = dockerexec.Run()
+					err_exec := dockerexec.Run()
 					_ = dockerfile_rm.Run()
+
+					initLog("docker.go " + fmt.Sprintf("%v", err_exec))
+					initLog("docker.go " + string(stderr_dockerfile_rm.Bytes()))
 				}else{
 					red.Print("==> [Error] ")
 					white.Print("The environment already up\n")	
@@ -199,43 +344,71 @@ pacman:
 					dockerexec.Stdout = os.Stdout
 					dockerexec.Stderr = os.Stderr
 				
-					_ = dockerexec.Run()
-	
+					err_exec := dockerexec.Run()
+					initLog("docker.go " + fmt.Sprintf("%v", err_exec))
 				}
 
 			}		
 		}else if strings.ToLower(environment) == "windows"{
 			check_flag := CheckFlag(pkgmanager, distro, library, "Windows")
 			if check_flag == true { 
-				dir_name := GetDirectoryName()
+				dir_name := ""
+				if name == ""{	
+					dir_name = GetDirectoryName()
+				}else{
+					dir_name = name
+				}
 				container_id := GetContainerID(dir_name)
 				if container_id == "Not Found"{
 					dir_mount := fmt.Sprintf(".:/%v", dir_name)
 					workdir := fmt.Sprintf("/%v", dir_name)
 
 					dockerbuild := exec.Command("docker", "build", ".", "-t", string(dir_name))
-					dockerrun := exec.Command("docker", "run", "--name", dir_name, "-v", dir_mount, "--workdir", workdir, "-itd", dir_name, "bash")
+					var stderr_dockerbuild bytes.Buffer
+					dockerbuild.Stderr = &stderr_dockerbuild
+
 					dockerfile_rm := exec.Command("rm", "Dockerfile")				
+					var stderr_dockerfile_rm bytes.Buffer
+					dockerfile_rm.Stderr = &stderr_dockerfile_rm
+
+					data := Port_to_Docker(dir_name, dir_mount, workdir, port)
+					dockerrun := exec.Command(data[0], data[1:]...)
+					var stderr_dockerrun bytes.Buffer
+					dockerrun.Stderr = &stderr_dockerrun
 
 					blue.Print("==> [In Progress] ")
 					white.Print("Setting up environment...\n")
-					_, _ = dockerbuild.CombinedOutput()
+					_ = dockerbuild.Run()
+					initLog("docker.go " + string(stderr_dockerbuild.Bytes()))
+					save_name := fmt.Sprintf(fmt.Sprintf("./backup/%v-original.tar", dir_name))
+					dockersave := exec.Command("docker", "image", "save", "-o", save_name, dir_name)
+					var stderr_dockersave bytes.Buffer
+					dockersave.Stderr = &stderr_dockersave
+
+					_ = dockersave.Run()
+					initLog("docker.go " + string(stderr_dockersave.Bytes()))
+
 					blue.Print("==> [In Progress] ")
 					white.Print("Starting the environment...\n")
-					_, _ = dockerrun.CombinedOutput()
+					_ = dockerrun.Run()
+
+					initLog("docker.go " + string(stderr_dockerrun.Bytes()))
 
 					container_id = GetContainerID(dir_name)
 
 					green.Print("==> [Success] ")
-					white.Print(fmt.Sprintf("The environment is running as a docker container with id %v\n", container_id))
+					white.Print(fmt.Sprintf("The environment is running as a docker container named %v with id %v\n", dir_name, container_id))
 
 					dockerexec := exec.Command("docker", "exec", "-it" , container_id, "/bin/bash")
 					dockerexec.Stdin = os.Stdin
 					dockerexec.Stdout = os.Stdout
 					dockerexec.Stderr = os.Stderr
 				
-					_ = dockerexec.Run()
+					err_exec := dockerexec.Run()
 					_ = dockerfile_rm.Run()
+
+					initLog("docker.go " + fmt.Sprintf("%v", err_exec))
+					initLog("docker.go " + string(stderr_dockerfile_rm.Bytes()))
 				}else{
 					red.Print("==> [Error] ")
 					white.Print("The environment already up\n")		
@@ -244,12 +417,69 @@ pacman:
 					dockerexec.Stdout = os.Stdout
 					dockerexec.Stderr = os.Stderr
 				
-					_ = dockerexec.Run()
+					err_exec := dockerexec.Run()
+
+					initLog("docker.go " + fmt.Sprintf("%v", err_exec))
 
 				}
 			}
 		}
 	}
+}
+
+func Port_to_Docker(dir_name string, dir_mount string, workdir string, port string) []string {
+	if port == ""{
+		mkdir_run := exec.Command("mkdir", "./run")
+
+		err_mkdir := mkdir_run.Run()
+		
+		initLog("docker.go " + fmt.Sprintf("%v", err_mkdir))
+
+		reset := []byte("")
+		err_writefile := os.WriteFile("./run/connect", reset, 0644)
+
+		initLog("docker.go " + fmt.Sprintf("%v", err_writefile))
+
+		file, err_openfile := os.OpenFile("./run/connect", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+		initLog("docker.go " + fmt.Sprintf("%v", err_openfile))
+
+		write := fmt.Sprintf("docker run --name %v -v %v --workdir %v -itd %v bash", dir_name, dir_mount, workdir, dir_name)
+
+		_,_ = file.WriteString(write)
+
+		dat, err_readfile := os.ReadFile("./run/connect")
+		data := strings.Split(string(dat), " ")
+
+		initLog("docker.go " + fmt.Sprintf("%v", err_readfile))
+
+		return data
+	}else{
+		p := strings.Split(port, ",")
+		reset := []byte("")
+		err_writefile := os.WriteFile("./run/connect", reset, 0644)
+		initLog("docker.go " + fmt.Sprintf("%v", err_writefile))
+
+		file, err_openfile := os.OpenFile("./run/connect", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		initLog("docker.go " + fmt.Sprintf("%v", err_openfile))
+		write := fmt.Sprintf("docker run --name %v -v %v --workdir %v",dir_name, dir_mount, workdir)
+
+		for _, p_ := range p{
+			write += fmt.Sprintf(" -p %v:%v", p_, p_)
+		}
+
+		write += fmt.Sprintf(" -itd %v bash", dir_name)	
+		_,_ = file.WriteString(write)
+
+		dat, err_readfile := os.ReadFile("./run/connect")
+
+		initLog("docker.go " + fmt.Sprintf("%v", err_readfile))
+
+		data := strings.Split(string(dat), " ")
+
+		return data
+	}	
+
 }
 
 func CheckValidDistro(distro string) bool{
@@ -291,10 +521,13 @@ func CheckMatch(pkgmanager string, distro string) bool {
 
 func apt(distro string, target string, libraries string){
 	reset := []byte("")
-	_ = os.WriteFile("./Dockerfile", reset, 0644)
+	err_writefile := os.WriteFile("./Dockerfile", reset, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_writefile))
 	//Open Docker file
-	file, _ := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err_openfile := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	 
+	initLog("docker.go " + fmt.Sprintf("%v", err_openfile))
+
 	write1 := fmt.Sprintf("FROM %v:latest\n\n", strings.ToLower(distro))
 	write2 := "RUN apt update 2>/dev/null\n"
 	write3 := "RUN apt upgrade -y 2>/dev/null\n"
@@ -330,13 +563,20 @@ func apt(distro string, target string, libraries string){
 
 	writelibrary_essential := "\nRUN apt install git -y 2>/dev/null"
 	_,_ = file.WriteString(writelibrary_essential)
+
+	write_ttyd := "\nRUN apt install -y build-essential cmake git libjson-c-dev libwebsockets-dev\nRUN git clone https://github.com/tsl0922/ttyd.git\nWORKDIR ttyd\nRUN mkdir build\nWORKDIR build\nRUN cmake ..\nRUN make && make install"
+
+	_,_ = file.WriteString(write_ttyd)
+
 }
 
 func dnf(distro string, target string, libraries string){
 	reset := []byte("")
-	_ = os.WriteFile("./Dockerfile", reset, 0644)
+	err_writefile := os.WriteFile("./Dockerfile", reset, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_writefile))
 	//Open Docker file
-	file, _ := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err_openfile := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_openfile))
 
 	write1 := "FROM fedora:latest\n\n"
 	write2 := "RUN dnf update -y 2>/dev/null\n"
@@ -376,9 +616,11 @@ func dnf(distro string, target string, libraries string){
 
 func yum(distro string, target string, libraries string){
 	reset := []byte("")
-	_ = os.WriteFile("./Dockerfile", reset, 0644)
+	err_writefile := os.WriteFile("./Dockerfile", reset, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_writefile))
 	//Open Docker file
-	file, _ := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err_openfile := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_openfile))
 
 	write1 := "FROM fedora:latest\n\n"
 	write2 := "RUN yum update -y 2>/dev/null\n"
@@ -417,9 +659,11 @@ func yum(distro string, target string, libraries string){
 
 func zypper(distro string, target string, libraries string){
 	reset := []byte("")
-	_ = os.WriteFile("./Dockerfile", reset, 0644)
+	err_writefile := os.WriteFile("./Dockerfile", reset, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_writefile))
 	//Open Docker file
-	file, _ := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err_openfile := os.OpenFile("Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	initLog("docker.go " + fmt.Sprintf("%v", err_openfile))
 	 
 	write1 := "FROM opensuse/leap:latest\n\n"
 	write2 := "RUN zypper update -y 2>/dev/null\n"

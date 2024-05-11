@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 	"os/exec"
+	"bytes"
 )
 
 var runCmd = &cobra.Command{
@@ -37,7 +38,8 @@ func init() {
 
 
 func GetDirectoryName() string{
-	dir, _ := os.Getwd()
+	dir, err_dir := os.Getwd()
+	initLog("run.go " + fmt.Sprintf("%v", err_dir))
 	dir_name_ := strings.Split(dir, "/")
 	dir_name := dir_name_[len(dir_name_)-1]
 	return dir_name
@@ -45,7 +47,10 @@ func GetDirectoryName() string{
 
 func GetContainerID(dir_name string) string {
 	cmd := exec.Command("docker", "container", "ls", "--all", "--quiet", "--filter", fmt.Sprintf("name=%v", dir_name))
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	output, _ := cmd.CombinedOutput()
+	initLog("run.go " + string(stderr.Bytes()))
 	if string(output) != ""{
 		container_id := strings.TrimSpace(string(output)[0:len(string(output))-1])
 		return container_id

@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
+	"bytes"
 )
 
 // resetCmd represents the reset command
@@ -32,9 +33,12 @@ var resetCmd = &cobra.Command{
 		remote_machine := cmd.Flags().Lookup("remote_machine").Changed
 		
 		check_docker := exec.Command("docker", "network", "ls")
-		_, err := check_docker.CombinedOutput()
+		var stderr_check_docker bytes.Buffer
+		check_docker.Stderr = &stderr_check_docker
+		err := check_docker.Run()
 
 		if err != nil{
+			initLog("reset.go " + string(stderr_check_docker.Bytes()))
 			red.Print("==> [Error] ")
 			white.Print("Docker not running\n")
 		}else{
@@ -53,8 +57,16 @@ var resetCmd = &cobra.Command{
 				}else{
 					if docker == true{
 						dockerstop := exec.Command("docker", "stop", container_id)
+						var stderr_dockerstop bytes.Buffer
+						dockerstop.Stderr = &stderr_dockerstop
+
 						dockerprune := exec.Command("docker", "system", "prune")
+						var stderr_dockerprune bytes.Buffer
+						dockerprune.Stderr = &stderr_dockerprune
+
 						dockerrmi := exec.Command("docker","rmi",dir_name)
+						var stderr_dockerrmi bytes.Buffer
+						dockerrmi.Stderr = &stderr_dockerrmi
 
 						blue.Print("==> [In Progress] ")
 						white.Print("Deleting the environment...\n")		
@@ -63,6 +75,11 @@ var resetCmd = &cobra.Command{
 						_ = dockerprune.Run()
 						_ = dockerprune.Run()
 						
+						initLog("reset.go " + string(stderr_dockerstop.Bytes()))
+						initLog("reset.go " + string(stderr_dockerrmi.Bytes()))
+						initLog("reset.go " + string(stderr_dockerprune.Bytes()))
+						initLog("reset.go " + string(stderr_dockerprune.Bytes()))
+
 						green.Print("==> [Success] ")
 						white.Print(fmt.Sprintf("Deletion complete\n"))
 	
@@ -72,10 +89,21 @@ var resetCmd = &cobra.Command{
 							credential := strings.Split(string(credentials), "\n")
 							reset_command := fmt.Sprintf("ssh -i /root/.ssh/id_rsa %v 'rm -rf /%v'", credential[0], dir_name)
 							dockerrm := exec.Command("docker", "exec", "-it", container_id, "sh", "-c", reset_command)
+							var stderr_dockerrm bytes.Buffer
+							dockerrm.Stderr = &stderr_dockerrm
+
 							dockerstop := exec.Command("docker", "stop", container_id)
+							var stderr_dockerstop bytes.Buffer
+							dockerstop.Stderr = &stderr_dockerstop
+
 							dockerprune := exec.Command("docker", "system", "prune")
+							var stderr_dockerprune bytes.Buffer
+							dockerprune.Stderr = &stderr_dockerprune
+
 							dockerrmi := exec.Command("docker","rmi",dir_name)
-							
+							var stderr_dockerrmi bytes.Buffer
+							dockerrmi.Stderr = &stderr_dockerrmi
+								
 							blue.Print("==> [In Progress] ")
 							white.Print("Resetting the environment...\n")			
 							_ = dockerrm.Run()
@@ -83,7 +111,14 @@ var resetCmd = &cobra.Command{
 							_ = dockerrmi.Run()
 							_ = dockerprune.Run()
 							_ = dockerprune.Run()
-
+							
+							initLog("reset.go " + string(stderr_dockerrm.Bytes()))
+							initLog("reset.go " + string(stderr_dockerstop.Bytes()))
+							initLog("reset.go " + string(stderr_dockerrmi.Bytes()))
+							initLog("reset.go " + string(stderr_dockerprune.Bytes()))
+							initLog("reset.go " + string(stderr_dockerprune.Bytes()))
+	
+	
 							green.Print("==> [Success] ")
 							white.Print(fmt.Sprintf("Reset complete\n"))
 	

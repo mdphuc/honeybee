@@ -1,0 +1,10 @@
+[Unit]
+Description=Web Terminal
+After=network.target
+ 
+[Service]
+ExecStart=/bin/bash -c "ttyd -W -p 2005 bash"
+SyslogIdentifier=ttyd
+ 
+[Install]
+WantedBy=multi-user.target

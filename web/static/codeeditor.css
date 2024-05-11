@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
+
+/* .container textarea {
+    background-color:  #121212;
+    border:1px solid #0dddf0;
+    resize: none;
+    width: 100%;
+    height: 33.333%;
+    font-size: .85rem;
+    padding: 10px;
+    resize: vertical;
+    overflow-y: scroll;
+    color:white;
+}
+
+.gutter {
+  cursor: e-resize;
+  height: 100%;
+  background: grey;
+}
+.gutter.gutter-horizontal {
+    cursor: ew-resize;
+} */
+
+.editor {
+  width: 94%;
+  display: inline-flex;
+  gap: 10px;
+  font-family: monospace;
+  line-height: 21px;
+  background: #282a3a;
+  border-radius: 2px;
+  padding: 20px 10px;
+  height: 300px;
+  overflow-y: auto;
+  resize: both;
+  max-width: 94%;
+}
+
+.line-numbers {
+  width: 20px;
+  text-align: right;
+  height: 9999px;
+}
+
+.line-numbers span {
+  counter-increment:  linenumber;
+}
+
+.line-numbers span::before {
+  content: counter(linenumber);
+  display: block;
+  color: #506882;
+}
+
+textarea {
+
+  height: 9999px;
+  line-height: 21px;
+  overflow-y: hidden;
+  padding: 0;
+  border: 0;
+  background: #282a3a;
+  color: #FFF;
+  min-width: 500px;
+  outline: none;
+  resize: none;
+}
+
