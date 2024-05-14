@@ -2,9 +2,9 @@ version: "2"
 services:
   guacamole:
     image: oznu/guacamole:latest
-    container_name: guacamole
+    container_name: honeybee-guacamole
     volumes:
-      - postgres:/config
+      - .:/config
     ports:
       - 8080:8080
 volumes:

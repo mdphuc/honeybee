@@ -6,7 +6,7 @@
 <body>
   <style>
     .flex {
-      display: flex;
+      display: flex; 
       flex-direction: row;
     }
 
@@ -151,10 +151,13 @@
           {% endfor %}
         </ul>
       </div>
+      <br><br><br>
     </div>
     <div class="split1 left">
       <div style="margin-left: 30px; margin-top: -10px;">
         <h1>Honeybee</h1>
+        <p>Welcome back <b>{{name}}</b>!</p>
+        <br>
         <form action="{{url_for('logout')}}" method="post">
           <input type="submit" value="Logout">
         </form>
@@ -214,7 +217,7 @@
 
           }
         </script>
-        <button onclick="getKey()">Show key</button><input id="KEY" style="margin-left: 15px;" readonly>
+        <button onclick="getKey()">Show key</button><input id="KEY" style="margin-left: 15px;" readonly><button onclick="document.getElementById('KEY').value = ''"  style="margin-left: 15px;">Clear</button>
         <br><br>
         <form action="{{url_for('home', type='user')}}" method="post" id="listuser"></form>
         <button onclick="checkAccess_('listuser')">List User</button>
@@ -241,13 +244,65 @@
         <br><br>
         <button onclick="tableToCSV()">Export to .csv</button>
         <br><br>
-        <button onclick="addUser('user_file_form')">Add user</button>
+        <button onclick="guacamole('initiate')">Initiate Guacamole</button>
         <br><br>
-        <form action="{{url_for('register')}}" id="user_file_form" method="post" enctype="multipart/form-data">
-          <label for="user_file">User file: </label>
-          <input type="file" id="user_file" name="user_file"/>   
-        </form>
-        <script src="{{url_for('static', filename='addUser.js')}}"></script>
+        <button onclick="guacamole('user_setup')">User Guac setup</button>
+        <br><br>
+        <label for="add">Add user</label>
+        <input type="checkbox" id="add" name="add">
+        <br><br>
+        <div id="useradd" style="display: none;">
+          <form action="{{url_for('reg')}}" id="admin_file_form" method="post">
+            <label for="user_file">User file: </label>
+            <input type="file" id="user_file" name="user_file"/>   
+          </form>
+          <br>
+          <button onclick="addUser('admin_file_form')">Add admin</button>
+          <br>
+          <br>
+          <form action="{{url_for('register')}}" id="user_file_form" method="post" enctype="multipart/form-data">
+            <label for="user_file">User file: </label>
+            <input type="file" id="user_file" name="user_file"/>   
+          </form>
+          <br>
+          <button onclick="addUser('user_file_form')">Add user</button>
+          <script src="{{url_for('static', filename='addUser.js')}}"></script>
+        </div>
+        <label for="update">Update user</label>
+        <input type="checkbox" id="update" name="update">
+        <br><br>
+        <div id="userupdate" style="display: none;">
+          <form action="{{url_for('update')}}" id="update_file_form" method="post">
+            <label for="user_file">User file: </label>
+            <input type="file" id="user_file" name="user_file"/>   
+          </form>
+          <br>
+          <button onclick="addUser('update_file_form')">Update</button>
+          <br>
+          <br>
+          <script src="{{url_for('static', filename='addUser.js')}}"></script>
+        </div>
+
+        <script>
+          add = document.getElementById("add")
+          add.addEventListener("click", function(){
+            if (add.checked){
+              document.getElementById("useradd").style.display = 'block'
+            }else{
+              document.getElementById("useradd").style.display = 'none'
+            }
+          })
+        </script>
+        <script>
+          update = document.getElementById("update")
+          update.addEventListener("click", function(){
+            if (update.checked){
+              document.getElementById("userupdate").style.display = 'block'
+            }else{
+              document.getElementById("userupdate").style.display = 'none'
+            }
+          })
+        </script>
         <script>
           function tableToCSV(){
             
@@ -310,19 +365,21 @@
         </script>
 
         <br><br>
-        <br><br>
 
         
         <p style="color: red; font-weight: bold;">Caution!</p>
         <ul>
           <li>Exercise at your own risk</li>
         </ul>
+
+        <br><br><br><br>
       </div>
 
     </div>
 
     <script src="{{url_for('static', filename='fetch.js')}}"></script>
     <script src="{{url_for('static', filename='check_access.js')}}"></script>
+    <script src="{{url_for('static', filename='guacamole.js')}}"></script>
     <script>
       window.onload = function(){
         if (window.location.pathname === "/docker"){

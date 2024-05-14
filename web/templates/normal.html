@@ -94,7 +94,7 @@
     margin-top: 16px;
     min-height: 30px;
 
-  }
+  } 
 
   .copied {
     display: none;
@@ -221,10 +221,13 @@
           {% endfor %}
         </ul>
       </div>
+      <br><br><br>
     </div>
     <div class="split1 left">
       <div style="margin-left: 30px; margin-top: -10px;">
         <h1>Honeybee</h1>
+        <p>Welcome back <b>{{name}}</b>!</p>
+        <br>
         <form action="{{url_for('logout')}}" method="post">
           <input type="submit" value="Logout">
         </form>
@@ -235,13 +238,14 @@
           document.getElementById("test").appendChild(document.importNode(getContent, true))
         </script>
         <script>
-          function getKey(){
+          function getKey(target){
             let key = prompt("Password:")
             if (key == null){
               return
             }
             let entry = {
-              "key" : key
+              "key" : key,
+              "target" : target
             }
             fetch(`${window.origin}/getKey`, {
               method: 'POST',
@@ -257,14 +261,17 @@
               }
 
               response.json().then(function(data){
-                document.getElementById("KEY").value = data["key"]
+                document.getElementById(target).value = data["key"]
               })
             })
 
           }
         </script>
         <br><br>
-        <button onclick="getKey()">Show key</button><input id="KEY" style="margin-left: 15px;" readonly>
+        <button onclick="getKey('KEY')">Show key</button><input id="KEY" style="margin-left: 15px;" readonly><button onclick="document.getElementById('KEY').value = ''" style="margin-left: 15px;">Clear</button>
+        <br>
+        <br>
+        <button onclick="getKey('GUACKEY')">Show Guac key</button><input id="GUACKEY" style="margin-left: 15px;" readonly><button onclick="document.getElementById('GUACKEY').value = ''" style="margin-left: 15px;">Clear</button>
         <br>
         <br>
         <label for="modes">Choose a mode</label>

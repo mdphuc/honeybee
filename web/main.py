@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 import os
 import hashlib
 import random
-import subprocess
+import subprocess 
 import datetime
 import logg
 from convert_time import convert_time
@@ -15,12 +15,15 @@ import random
 from graph import *
 from werkzeug.utils import secure_filename
 import pandas as pd
+import string
+import asym
+import guaca
 
 #BEAVER##DUH
 
 number = random.randint(10**5,10**15)
 
-admin_key = os.environ.get("HoneyBeeAdminID") 
+# admin_key = os.environ.get("HoneyBeeAdminID") 
 
 keywords = ["Port", "AllowTerminalOnWeb", "Exec", "PasswordProtected", "AllowAccess", "IP"]
 
@@ -60,6 +63,8 @@ for keyword in flag.keys():
 def allowed_file(filename):
   return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+admin_key = hashlib.sha256(b"dawg").hexdigest()
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = hashlib.sha256(b"app").hexdigest()
 app.config["SQLALCHEMY_DATABASE_URI"]= "sqlite:///database.db"
@@ -80,9 +85,12 @@ db = SQLAlchemy(app)
 
 s = URLSafeTimedSerializer(app.secret_key)
 
+
 class User(db.Model, UserMixin):
   __tablename__ = "user"
   id = db.Column(db.Integer, primary_key=True, unique=True)
+  fullname = db.Column(db.String(30), nullable=False, unique=True)
+  email = db.Column(db.String(40), nullable=False, unique=True)
   username = db.Column(db.String(20), nullable=False, unique=True)
   password = db.Column(db.String(50), nullable=False)
   active = db.Column(db.Boolean, default=True, nullable=False)
@@ -91,8 +99,9 @@ class User(db.Model, UserMixin):
   last_login = db.Column(db.String(20), nullable=False)
   key = db.Column(db.String(30), default="null")
   key_user = db.Column(db.String(30), default="null")
+  guac_password = db.Column(db.String(50), default="")
 
-  def __init__(self, username, password, role, key, date_created, last_login, active, key_user):
+  def __init__(self, username, password, role, key, date_created, last_login, active, key_user, fullname, email, guac_password):
     super().__init__()
     self.username = username
     self.password = password
@@ -102,9 +111,12 @@ class User(db.Model, UserMixin):
     self.date_created = date_created
     self.last_login = last_login
     self.active = active
+    self.fullname = fullname
+    self.email = email
+    self.guac_password = guac_password
   
   def __repr__(self):
-      return f"User('{self.username}','{self.password}','{self.role}','{self.key}','{self.date_created}','{self.last_login}','{self.active}','{self.key_user}')"
+      return f"User('{self.username}','{self.password}','{self.role}','{self.key}','{self.date_created}','{self.last_login}','{self.active}','{self.key_user}','{self.fullname}','{self.email}','{self.guac_password}')"
 
 @app.before_request
 def block_method():
@@ -123,10 +135,10 @@ def home(type):
   if request.method == "GET":
     if current_user.is_authenticated:
       logs = log_time_calculate()
-      if current_user.is_authenticated and current_user.get_id() == "1" and current_user.key == "yo" and current_user.key_user == "null":
-        return render_template("admin.html", logs = logs)
+      if current_user.is_authenticated and current_user.get_id() == "1" and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
+        return render_template("admin.html", logs = logs, name = current_user.username)
       else:
-        if current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+        if current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
           if type != "graph":
             log_remove = []
             for i in range(len(logs)):
@@ -135,7 +147,7 @@ def home(type):
             for lr in log_remove[::-1]:
               print(lr)
               logs.pop(lr)
-            return render_template("normal.html", logs = logs)
+            return render_template("normal.html", logs = logs, name = current_user.fullname)
           else:
             di = get_status("normal")
             return render_template("normalgraph.html", data = di, graph="true")
@@ -146,12 +158,12 @@ def home(type):
       return render_template("login.html")
   else:
     if current_user.is_authenticated:
-      if current_user.is_authenticated and current_user.get_id() == "1" and current_user.key == "yo" and current_user.key_user == "null":
+      if current_user.is_authenticated and current_user.get_id() == "1" and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
         info = check_access(type.split("_")[0], "all")
-        return render_template("admin.html",  logs = info[0], headers = info[1], data = info[2], access = info[3])
+        return render_template("admin.html",  logs = info[0], headers = info[1], data = info[2], access = info[3], name = current_user.username)
       else:
         key = request.form.get("key")
-        if key == current_user.key_user:
+        if key == asym.decrypt(current_user.key_user, current_user.username):
           logs = log_time_calculate()
           log_remove = []
           for i in range(len(logs)):
@@ -167,19 +179,61 @@ def home(type):
           headers = ["ID", "STATUS", "REPOSITORY", "TAG", "IMAGE ID", "SIZE", "CREATED AT", "CONTAINER ID", "UP FOR", "PORTS"]
           
           if len(type.split("_")) == 1:
-            return render_template("normal.html", headers = headers, data = di, logs = logs, access="true",graph="false")
+            return render_template("normal.html", headers = headers, data = di, logs = logs, access="true",graph="false", name = current_user.fullname)
           else:
             if type.split("_")[1] == "graph":
               graph = Graph()
               graph.get_access_point()
               graph.get_node(di)
               graph.generate()
-              return render_template("normal.html", headers = headers, data = di, logs = logs, access="true", graph="true")
+              return render_template("normal.html", headers = headers, data = di, logs = logs, access="true", graph="true", name = current_user.fullname)
         else:
           logg.logging("main.py unauthorized access", current_user.username)
           abort(403)
     else:
       return render_template("login.html")
+
+@app.route("/guac_setup/<state>", methods=["POST"])
+@login_required
+def guac_setup(state):
+  if current_user.is_authenticated and current_user.get_id() == "1" and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
+    req = request.get_json()
+    if req["key"] == asym.decrypt(current_user.key, current_user.username):
+      if state == "initiate":
+        original = os.getcwd()
+        os.chdir("./guac")
+        dockercompose = subprocess.Popen(["docker", "compose", "up", "-d"], stdout=subprocess.PIPE)
+        (target_container, err) = dockercompose.communicate()
+        os.chdir(original)
+      elif state == "user_setup":
+        users = User.query.all()
+        usrs = []
+        for usr in users:
+          if usr.username != "admin" and usr.id != 1 and asym.decrypt(usr.guac_password, usr.username) == "":
+            usrs.append({"fullname" : usr.fullname, "username" : usr.username, "email" : usr.email, "role" : usr.role})
+        try:
+          token = guaca.get_token()
+        except:
+          logg.logging("main.py guacamole container down or error within container", current_user.username)
+          return redirect(url_for("home", type="index"))
+        try:
+          for u in usrs:
+            if usr.role == "admin":
+              guaca.add_admin(usr)
+            elif usr.role == "user":
+              guaca.add_user(usr)
+        except:
+          logg.logging("main.py error when add user", current_user.username)
+          return redirect(url_for("home", type="index"))
+         
+    else:
+      logg.logging("main.py unauthorized access", current_user.username)
+      abort(403)
+  else:
+    logg.logging("main.py unauthorized access", current_user.username)
+    abort(403)
+
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -213,20 +267,29 @@ def logout():
 @app.route("/getKey", methods=["POST"])
 @login_required
 def getKey():
-  if current_user.is_authenticated and current_user.get_id() == "1" and current_user.key == "yo" and current_user.key_user == "null":
+  if current_user.is_authenticated and current_user.get_id() == "1" and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
     req = request.get_json()
     if hashlib.sha256(req["key"].encode()).hexdigest() == current_user.password:
-      print("asdasdasdasdasdasd")
-      res = make_response(jsonify({"key": current_user.key}), 200)
+      res = make_response(jsonify({"key": asym.decrypt(current_user.key, current_user.username)}), 200)
       return res
     else:
       logg.logging("main.py unauthorized access", current_user.username)
       abort(403)  
-  elif current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+  elif current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
     req = request.get_json()
     if hashlib.sha256(req["key"].encode()).hexdigest() == current_user.password:
-      res = make_response(jsonify({"key": current_user.key_user}), 200)
-      return res
+      if req["target"] == "KEY":
+        res = make_response(jsonify({"key": asym.decrypt(current_user.key_user, current_user.username)}), 200)
+        return res
+      elif req["target"] == "GUACKEY":
+        gp = asym.decrypt(current_user.guac_password, current_user.username)
+        if gp == "":
+          res = make_response(jsonify({"key": "None"}), 200)
+          return res
+        else:
+          res = make_response(jsonify({"key": gp}), 200)
+          return res
+         
     else:
       logg.logging("main.py unauthorized access", current_user.username)
       abort(403) 
@@ -238,21 +301,23 @@ def getKey():
 @app.route("/register", methods=["POST"])
 @login_required
 def register():
-  if current_user.is_authenticated and current_user.get_id() == "1" and current_user.key == "yo" and current_user.key_user == "null":
+  if current_user.is_authenticated and current_user.get_id() == "1" and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
     key = request.form.get("key")
     usr_col = request.form.get("usr_col")
     pwd_col = request.form.get("pwd_col")
-    if key == current_user.key:
+    fullname_col = request.form.get("fullname_col")
+    email_col = request.form.get("email_col")
+    if key == asym.decrypt(current_user.key, current_user.username):
       file = request.files['user_file']
       if file.filename != "":
         if file and allowed_file(file.filename):
           filename = secure_filename(file.filename)
           file.save('./{0}'.format(filename))
           try:
-            data = pd.read_csv("./{0}".format(filename), usecols=[usr_col, pwd_col])
+            data = pd.read_csv("./{0}".format(filename), usecols=[fullname_col, email_col, usr_col, pwd_col])
             for i in range(len(data[usr_col])):
-              key_user = hashlib.sha256(data[usr_col][i]).hexdigest()
-              usr = User(username=data[usr_col][i], password=data[pwd_col][i], role="user", key="null", key_user=key_user, date_created=datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S"), last_login="null", active=True)
+              key_user = asym.encrypt(hashlib.sha256(data[fullname_col][i] + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))).hexdigest())
+              usr = User(username=data[usr_col][i], password=hashlib.sha256(data[pwd_col][i].encode()).hexdigest(), role="user", key="null", key_user=asym.encrypt(key_user, current_user.username), date_created=datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S"), last_login="null", active=True, fullname=data[fullname_col][i], email=data[email_col][i],guac_password=asym.encrypt("", current_user.username))
               db.session.add(usr)
               db.session.commit()
           except:
@@ -265,10 +330,36 @@ def register():
     logg.logging("main.py unauthorized access", current_user.username)
     abort(403)  
 
+@app.route("/reg", methods=["POST"])
+@login_required
+def reg():
+  if current_user.is_authenticated and current_user.get_id() == "1" and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
+    fullname = request.form.get("name")
+    email = request.form.get("email")
+    username = request.form.get("username")
+    password = request.form.get("password")
+
+    if fullname == "" or email == "" or username == "" or password == "":
+      logg.logging("main.py missing information when trying to add user", current_user.username)
+      
+    try:
+      key = asym.encrypt(hashlib.sha256(fullname + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))).hexdigest())
+      usr = User(username=username, password=password, role="admin", key=key, key_user="null", date_created=datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S"), last_login="null", active=True, fullname=fullname, email=email)
+      db.session.add(usr)
+      db.session.commit()
+    except:
+      logg.logging("main.py error when adding user", current_user.username)
+    
+    return redirect(url_for("home", type="index"))
+  else:
+    logg.logging("main.py unauthorized access", current_user.username)
+    abort(403)  
+
+
 @app.route("/dockerfile", methods=["POST"])
 @login_required
 def dockerfile():
-  if current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+  if current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
     return redirect(url_for("home", type="index"))
   else:
     logg.logging("main.py unauthorized access", current_user.username)
@@ -278,9 +369,9 @@ def dockerfile():
 @app.route("/nodockerfile", methods=["POST"])
 @login_required
 def nodockerfile():
-  if current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+  if current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
     req = request.get_json()
-    if req['key'] == current_user.key_user:
+    if req['key'] == asym.decrypt(current_user.key_user, current_user.username):
       text = request.form["dockerfile-edit"]
       Dockerfile_initial = open("../Dockerfile", "w")
       Dockerfile_initial.write(text)
@@ -326,10 +417,10 @@ def nodockerfile():
     abort(403)
 
 def check_access(type, target):
-  if current_user.is_authenticated and current_user.key == "yo" and current_user.key_user == "null":
+  if current_user.is_authenticated and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
     key = request.form["key"]
     user = User.query.filter_by(role = "admin").first()
-    if key == user.key:
+    if key == asym.decrypt(user.key, current_user.username):
       if type == "docker":
         di = get_status(target)
         logs = log_time_calculate()
@@ -341,9 +432,12 @@ def check_access(type, target):
         di = []
         users = User.query.all()
         for user in users:
-          if user.username != "admin" and user.role != "admin" and user.key != "yo":
-            di.append([user.id, user.username, user.active, user.role, user.date_created, user.last_login])
-        headers = ["ID", "USERNAME", "ACTIVE", "ROLE", "DATE CREATED", "LAST LOGIN"]
+          if user.username != "admin" and user.key != admin_key:
+            if asym.decrypt(user.guac_password, user.username) == "":
+              di.append([user.id, user.username, user.fullname, user.email, user.active, user.role, user.date_created, user.last_login, "-"])
+            else:
+              di.append([user.id, user.username, user.fullname, user.email, user.active, user.role, user.date_created, user.last_login, "UP"])     
+        headers = ["ID", "USERNAME", "FULL NAME", "EMAIL", "ACTIVE", "ROLE", "DATE CREATED", "LAST LOGIN", "GUAC"]
         return (logs, headers, di, "true")
     else:
       return redirect(url_for("home", type="index"))
@@ -354,13 +448,13 @@ def check_access(type, target):
 @app.route("/check_status/<type>", methods=["POST"])
 @login_required
 def check_status(type):
-  if current_user.is_authenticated and current_user.key == "yo" and current_user.key_user == "null":
+  if current_user.is_authenticated and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
     req = request.get_json()
     if type != "access":
       di = get_status("all") 
       res = make_response(jsonify({"data": di, "length_depth" : len(di[0])}), 200)
     else:
-      if req['key'] == current_user.key:    
+      if asym.encrypt(req['key']) == current_user.key:    
         res = make_response(jsonify({"access": "true"}), 200)
         user = User.query.filter_by(id = int(req['id'])).first()
         if req["state"] == True:
@@ -381,13 +475,13 @@ def check_status(type):
 @app.route("/check_status_user", methods=["POST"])
 @login_required
 def check_status_user(type):
-  if current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+  if current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
     req = request.get_json()
     if type != "access":
       di = get_status("all") 
       res = make_response(jsonify({"data": di, "length_depth" : len(di[0])}), 200)
     else:
-      if req['key'] == current_user.key:    
+      if req['key'] == asym.decrypt(current_user.key, current_user.username):    
         res = make_response(jsonify({"access": "true"}), 200)
         user = User.query.filter_by(id = int(req['id'])).first()
         if req["state"] == True:
@@ -466,14 +560,12 @@ def get_status(target):
   
   return di
 
-#k#u8m6Y0.1nq:2q2^&/cU.jcOvtOa:91
-
 @app.route('/expose_port', methods = ["POST"])
 @login_required
 def expose_port():
-  if current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+  if current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
     key = request.form["key"]
-    if key == current_user.key_user:
+    if key == asym.decrypt(current_user.key_user, current_user.username):
       ports_to_update = "".join(request.form["ports_to_update"].split())
       print(ports_to_update)
       if ports_to_update != "":
@@ -547,12 +639,48 @@ def expose_port():
     logg.logging("main.py unauthorized access", current_user.username)
     abort(403)
 
+@app.route("/update", methods = ["POST"])
+@login_required
+def update():
+  if current_user.is_authenticated and asym.decrypt(current_user.key, current_user.username) == admin_key and current_user.key_user == "null":
+    key = request.form.get("key")
+    usr_col = request.form.get("usr_col")
+    pwd_col = request.form.get("pwd_col")
+    fullname_col = request.form.get("fullname_col")
+    if key == asym.decrypt(current_user.key, current_user.username):
+      file = request.files['user_file']
+      if file.filename != "":
+        if file and allowed_file(file.filename):
+          filename = secure_filename(file.filename)
+          file.save('./{0}'.format(filename))
+          try:
+            data = pd.read_csv("./{0}".format(filename), usecols=[fullname_col, usr_col, pwd_col])
+            for i in range(len(data[usr_col])):
+              usr = User(fullname=data[fullname_col][i])
+              if usr == None:
+                logg.logging("main.py error when reading csv file", current_user.username)
+              else:
+                if usr.username != data[usr_col][i]:
+                  usr.username = data[usr_col][i]
+                  db.session.commit()
+                if usr.password != hashlib.sha256(data[pwd_col][i].encode()).hexdigest():
+                  usr.password = hashlib.sha256(data[pwd_col][i].encode()).hexdigest()
+                  db.session.commit()
+          except:
+            logg.logging("main.py error when reading csv file", current_user.username)
+      return redirect(url_for("home", type="index"))
+
+  else:
+    logg.logging("main.py unauthorized access", current_user.username)
+    abort(403)
+
+
 @app.route("/check_iframe", methods=["POST"])
 @login_required
 def check_iframe():
-  if current_user.is_authenticated and current_user.key == "null" and current_user.key_user != "null":
+  if current_user.is_authenticated and current_user.key == "null" and asym.decrypt(current_user.key_user, current_user.username) != "null":
     req = request.get_json()
-    if req['key'] == current_user.key_user:
+    if req['key'] == asym.decrypt(current_user.key_user, current_user.username):
       read = subprocess.Popen(["docker", "ps", "--format", "{{.Image}}~{{.ID}}~{{.Status}}~{{.Ports}}"], stdout=subprocess.PIPE)
       (target_image, err) = read.communicate()
       target_image = target_image.decode().split("\n")
@@ -575,8 +703,6 @@ def check_iframe():
   else:
     logg.logging("main.py unauthorized access", current_user.username)
     abort(403)
-
-
   
 def check_log():
   with open('../log/app.log', 'r') as f:
