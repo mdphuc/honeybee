@@ -248,6 +248,13 @@
         <br><br>
         <button onclick="guacamole('user_setup')">User Guac setup</button>
         <br><br>
+        <button onclick="redirect('http://127.0.0.1:8080')">Open Guac</button>
+        <script>
+          function redirect(url){
+            window.open(url, '_blank').focus();
+          }
+        </script>
+        <br><br>
         <label for="add">Add user</label>
         <input type="checkbox" id="add" name="add">
         <br><br>

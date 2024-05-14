@@ -56,3 +56,9 @@
 2024/05/14 06:17:51 root.go:20: UTC: main.py unauthorized access
 2024/05/14 06:18:47 root.go:20: UTC: main.py unauthorized access
 2024/05/14 06:20:09 root.go:20: UTC: main.py unauthorized access
+2024/05/14 09:36:26 root.go:20: UTC: main.py unauthorized access
+2024/05/14 09:41:38 root.go:20: UTC: main.py unauthorized access
+2024/05/14 09:55:19 root.go:20: UTC: main.py unauthorized access
+2024/05/14 09:55:34 root.go:20: UTC: main.py guacamole container down or error within container
+2024/05/14 10:01:55 root.go:20: UTC: main.py unauthorized access
+2024/05/14 10:02:05 root.go:20: UTC: main.py guacamole container down or error within container

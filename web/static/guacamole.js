@@ -17,7 +17,11 @@ function guacamole(state){
     }
 
     response.json().then(function(data){
-
+      if (data["access"] == "true"){
+        document.getElementById("message_").innerHTML = "<p style='color: green; font-weight: bold'>Succeed</p>"
+      }else if (data["access"] == "false"){
+        document.getElementById("message_").innerHTML = "<p style='color: red; font-weight: bold'>Failed</p>"
+      }
     })
   })
 

@@ -200,11 +200,16 @@ def guac_setup(state):
     req = request.get_json()
     if req["key"] == asym.decrypt(current_user.key, current_user.username):
       if state == "initiate":
-        original = os.getcwd()
-        os.chdir("./guac")
-        dockercompose = subprocess.Popen(["docker", "compose", "up", "-d"], stdout=subprocess.PIPE)
-        (target_container, err) = dockercompose.communicate()
-        os.chdir(original)
+        try:
+          original = os.getcwd()
+          os.chdir("./guac")
+          dockercompose = subprocess.Popen(["docker", "compose", "up", "-d"], stdout=subprocess.PIPE)
+          (target_container, err) = dockercompose.communicate()
+          os.chdir(original)
+        except:
+          logg.logging("main.py error launching guacamole", current_user.username)
+          res = make_response(jsonify({"access": "false"}), 200)
+          return res
       elif state == "user_setup":
         users = User.query.all()
         usrs = []
@@ -213,19 +218,24 @@ def guac_setup(state):
             usrs.append({"fullname" : usr.fullname, "username" : usr.username, "email" : usr.email, "role" : usr.role})
         try:
           token = guaca.get_token()
-        except:
+        except Exception as e:
+          print(e)
           logg.logging("main.py guacamole container down or error within container", current_user.username)
-          return redirect(url_for("home", type="index"))
+          res = make_response(jsonify({"access": "false"}), 200)
+          return res
         try:
-          for u in usrs:
+          for usr in usrs:
             if usr.role == "admin":
               guaca.add_admin(usr)
             elif usr.role == "user":
               guaca.add_user(usr)
         except:
           logg.logging("main.py error when add user", current_user.username)
-          return redirect(url_for("home", type="index"))
-         
+          res = make_response(jsonify({"access": "false"}), 200)
+          return res
+
+      res = make_response(jsonify({"access": "true"}), 200)
+      return res
     else:
       logg.logging("main.py unauthorized access", current_user.username)
       abort(403)
@@ -452,6 +462,7 @@ def check_status(type):
     req = request.get_json()
     if type != "access":
       di = get_status("all") 
+      print(di)
       res = make_response(jsonify({"data": di, "length_depth" : len(di[0])}), 200)
     else:
       if asym.encrypt(req['key']) == current_user.key:    
@@ -531,7 +542,7 @@ def get_status(target):
             exist = True
           else:
             exist = False   
-      if len(name.split("-")) == 3 and name.split("-")[0] == "honeybee" and name.split("-")[1] == current_user.username and exist:
+      if len(name.split("-")) == 3 and name.split("-")[0] == "honeybee" and exist:
         tag = general[1]
         id = general[2]
         size = general[3]
